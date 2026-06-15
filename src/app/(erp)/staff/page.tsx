@@ -155,10 +155,18 @@ const [password, setPassword] = useState("");
 
     if (!response.ok) {
 
-      alert(result.error);
+  console.error(
+    "Create User Error:",
+    result
+  );
 
-      return;
-    }
+  alert(
+    "Create User Error:\n" +
+    result.error
+  );
+
+  return;
+}
 
     await supabase
       .from("staff")

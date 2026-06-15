@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
 
 import {
   LayoutDashboard,
@@ -9,6 +14,7 @@ import {
   Wallet,
   Factory,
   Boxes,
+  Package,
   BarChart3,
   Users,
   Settings,
@@ -44,16 +50,21 @@ const menuByRole = {
       href: "/production",
       icon: Factory,
     },
-    {
-      name: "Inventory",
-      href: "/inventory",
-      icon: Boxes,
-    },
-    {
-      name: "Finance",
-      href: "/finance",
-      icon: Receipt,
-    },
+{
+  name: "Inventory",
+  href: "/inventory",
+  icon: Boxes,
+},
+{
+  name: "Products",
+  href: "/products",
+  icon: Package,
+},
+{
+  name: "Finance",
+  href: "/finance",
+  icon: Receipt,
+},
     {
       name: "Analytics",
       href: "/analytics",
@@ -126,6 +137,18 @@ export default function Sidebar({
   setSidebarOpen,
 }: SidebarProps) {
   const pathname = usePathname();
+
+const router = useRouter();
+
+const handleLogout = async () => {
+
+  await supabase.auth.signOut();
+
+  localStorage.removeItem("role");
+
+  router.push("/login");
+
+};
 
   return (
     <>
@@ -236,11 +259,15 @@ export default function Sidebar({
 
         {/* Logout */}
         <div className="p-6">
-          <button className="w-full bg-red-600 hover:bg-red-700 transition-all rounded-2xl py-4 flex items-center justify-center gap-3 font-bold">
-            <LogOut size={20} />
-
-            Logout
-          </button>
+ <button
+  onClick={() => {
+    alert("Logout button works");
+  }}
+  className="w-full bg-red-600 hover:bg-red-700 transition-all rounded-2xl py-4 flex items-center justify-center gap-3 font-bold"
+>
+  <LogOut size={20} />
+  Logout
+</button>
         </div>
       </div>
     </>
