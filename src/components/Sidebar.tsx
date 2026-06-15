@@ -259,10 +259,8 @@ const handleLogout = async () => {
 
         {/* Logout */}
         <div className="p-6">
- <button
-  onClick={() => {
-    alert("Logout button works");
-  }}
+<button
+  onClick={handleLogout}
   className="w-full bg-red-600 hover:bg-red-700 transition-all rounded-2xl py-4 flex items-center justify-center gap-3 font-bold"
 >
   <LogOut size={20} />
