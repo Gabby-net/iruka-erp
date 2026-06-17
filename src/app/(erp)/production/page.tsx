@@ -69,8 +69,11 @@ export default function ProductionPage() {
       .order("created_at", {
         ascending: false,
       });
+      console.log("Production Logs:", productionData);
 
     setProducts(productsData || []);
+
+console.log(productionData);
 
     setProductionLogs(
       productionData || []
@@ -685,12 +688,8 @@ if (selectedProductData) {
                       >
 
                         <td className="p-4 font-semibold">
-
-                          {
-                            log.product_name
-                          }
-
-                        </td>
+  {log.bread}
+</td>
 
                         <td className="p-4">
 
@@ -698,13 +697,9 @@ if (selectedProductData) {
 
                         </td>
 
-                        <td className="p-4 text-blue-950 font-bold">
-
-                          {
-                            log.quantity_produced
-                          }
-
-                        </td>
+<td className="p-4 text-blue-950 font-bold">
+  {log.quantity}
+</td>
 
                         <td className="p-4 text-red-600 font-bold">
 
