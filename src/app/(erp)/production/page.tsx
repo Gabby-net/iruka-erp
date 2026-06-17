@@ -99,28 +99,58 @@ export default function ProductionPage() {
        SAVE PRODUCTION LOG
     ========================== */
 
-    await supabase
+const selectedProductData = products.find(
+  (p) => p.name === selectedProduct
+);
 
-      .from("production_logs")
+await supabase
+  .from("production_logs")
+  .insert([
+    {
+      product_id: selectedProductData?.id || null,
+      bread: selectedProduct,
+      quantity: Number(quantityProduced),
+      waste_quantity: Number(wasteQuantity || 0),
+      produced_by: "Production Staff",
+      batch: "IRK-" + Date.now(),
+      shift,
+      team: "A",
+      status: "Completed",
+      production_date:
+        new Date()
+          .toISOString()
+          .split("T")[0],
+    },
+  ]);
 
-      .insert([
-        {
-          product_name:
-            selectedProduct,
+/* UPDATE FINISHED GOODS STOCK */
 
-          quantity_produced:
-            Number(
-              quantityProduced
-            ),
+if (selectedProductData) {
 
-          waste_quantity:
-            Number(
-              wasteQuantity || 0
-            ),
+  const currentStock =
+    Number(selectedProductData.stock || 0);
 
-          shift,
-        },
-      ]);
+  const produced =
+    Number(quantityProduced || 0);
+
+  const waste =
+    Number(wasteQuantity || 0);
+
+  const netProduction =
+    produced - waste;
+
+  await supabase
+    .from("products")
+    .update({
+      stock:
+        currentStock +
+        netProduction,
+    })
+    .eq(
+      "id",
+      selectedProductData.id
+    );
+}
 
     /* =========================
        GET INVENTORY
@@ -340,7 +370,7 @@ export default function ProductionPage() {
       (sum, item) =>
         sum +
         Number(
-          item.quantity_produced || 0
+          item.quantity || 0
         ),
       0
     );
@@ -640,12 +670,12 @@ export default function ProductionPage() {
                   (log) => {
 
                     const net =
-                      Number(
-                        log.quantity_produced || 0
-                      ) -
-                      Number(
-                        log.waste_quantity || 0
-                      );
+  Number(
+    log.quantity || 0
+  ) -
+  Number(
+    log.waste_quantity || 0
+  );
 
                     return (
 
