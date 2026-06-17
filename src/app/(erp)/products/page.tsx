@@ -1,214 +1,228 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
 
 export default function ProductsPage() {
+const [products, setProducts] = useState<any[]>([]);
+const [loading, setLoading] = useState(true);
+const [search, setSearch] = useState("");
 
-  const [products, setProducts] =
-    useState<any[]>([]);
+useEffect(() => {
+fetchProducts();
+}, []);
 
-  const [loading, setLoading] =
-    useState(true);
+async function fetchProducts() {
+const { data, error } = await supabase
+.from("products")
+.select("*")
+.order("id", { ascending: true });
 
-  /* =========================
-     FETCH PRODUCTS
-  ========================== */
+if (error) {
+  console.error(error);
+} else {
+  setProducts(data || []);
+}
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+setLoading(false);
 
-  async function fetchProducts() {
 
-    const { data, error } =
-      await supabase
-        .from("products")
-        .select("*")
-        .order("id", {
-          ascending: true,
-        });
+}
 
-    if (error) {
+const filteredProducts = products.filter((product) =>
+product.name
+?.toLowerCase()
+.includes(search.toLowerCase())
+);
 
-      console.error(error);
+const totalStock = products.reduce(
+(sum, item) => sum + Number(item.stock || 0),
+0
+);
 
-    } else {
+const inventoryValue = products.reduce(
+(sum, item) =>
+sum +
+Number(item.stock || 0) *
+Number(item.price || 0),
+0
+);
 
-      setProducts(data || []);
-    }
+const lowStockCount = products.filter(
+(item) =>
+Number(item.stock) <=
+Number(item.reorder_level || 20)
+).length;
 
-    setLoading(false);
-  }
+if (loading) {
+return ( <div className="p-6">
+Loading products... </div>
+);
+}
 
-  if (loading) {
+return ( <div className="space-y-8">
 
-    return (
-      <div className="p-6">
-        Loading products...
-      </div>
-    );
-  }
+```
+  <div>
+    <h1 className="text-4xl font-bold text-slate-900">
+      Products Management
+    </h1>
 
-  return (
-    <div className="space-y-8">
+    <p className="text-gray-500 mt-2">
+      Bakery products and stock overview
+    </p>
+  </div>
 
-      {/* HEADER */}
+  <div className="grid md:grid-cols-4 gap-6">
 
-      <div>
+    <div className="bg-white p-6 rounded-2xl shadow">
+      <p className="text-gray-500">
+        Total Products
+      </p>
 
-        <h1 className="text-4xl font-bold">
-          Inventory Products
-        </h1>
+      <h2 className="text-3xl font-bold mt-2">
+        {products.length}
+      </h2>
+    </div>
 
-        <p className="text-gray-500 mt-2">
-          Live bakery inventory stock system
-        </p>
+    <div className="bg-white p-6 rounded-2xl shadow">
+      <p className="text-gray-500">
+        Total Stock
+      </p>
 
-      </div>
+      <h2 className="text-3xl font-bold text-green-600 mt-2">
+        {totalStock}
+      </h2>
+    </div>
 
-      {/* STATS */}
+    <div className="bg-white p-6 rounded-2xl shadow">
+      <p className="text-gray-500">
+        Low Stock
+      </p>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <h2 className="text-3xl font-bold text-red-600 mt-2">
+        {lowStockCount}
+      </h2>
+    </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow">
+    <div className="bg-white p-6 rounded-2xl shadow">
+      <p className="text-gray-500">
+        Inventory Value
+      </p>
 
-          <p className="text-gray-500">
-            Total Products
-          </p>
+      <h2 className="text-3xl font-bold text-blue-600 mt-2">
+        ₦{inventoryValue.toLocaleString()}
+      </h2>
+    </div>
 
-          <h2 className="text-3xl font-bold mt-2">
+  </div>
 
-            {products.length}
+  <div className="bg-white rounded-2xl shadow p-4">
 
-          </h2>
+    <input
+      type="text"
+      placeholder="Search products..."
+      value={search}
+      onChange={(e) =>
+        setSearch(e.target.value)
+      }
+      className="w-full border rounded-xl px-4 py-3"
+    />
 
-        </div>
+  </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow">
+  <div className="bg-white rounded-2xl shadow overflow-hidden">
 
-          <p className="text-gray-500">
-            Total Inventory
-          </p>
+    <table className="w-full">
 
-          <h2 className="text-3xl font-bold text-green-600 mt-2">
+      <thead>
 
-            {
-              products.reduce(
-                (sum, item) =>
-                  sum + item.stock,
-                0
-              )
-            }
+        <tr className="bg-gray-100">
 
-          </h2>
+          <th className="p-4 text-left">
+            SKU
+          </th>
 
-        </div>
+          <th className="p-4 text-left">
+            Product
+          </th>
 
-        <div className="bg-white p-6 rounded-2xl shadow">
+          <th className="p-4 text-left">
+            Stock
+          </th>
 
-          <p className="text-gray-500">
-            Active Products
-          </p>
+          <th className="p-4 text-left">
+            Price
+          </th>
 
-          <h2 className="text-3xl font-bold text-blue-600 mt-2">
+          <th className="p-4 text-left">
+            Status
+          </th>
 
-            {products.length}
+        </tr>
 
-          </h2>
+      </thead>
 
-        </div>
+      <tbody>
 
-      </div>
+        {filteredProducts.map(
+          (product) => (
 
-      {/* PRODUCTS TABLE */}
+            <tr
+              key={product.id}
+              className="border-b hover:bg-gray-50"
+            >
 
-      <div className="bg-white rounded-2xl shadow overflow-hidden">
+              <td className="p-4">
+                {product.sku || "-"}
+              </td>
 
-        <table className="w-full border-collapse">
+              <td className="p-4 font-semibold">
+                {product.name}
+              </td>
 
-          <thead>
+              <td className="p-4">
+                {product.stock}
+              </td>
 
-            <tr className="bg-gray-100">
+              <td className="p-4">
+                ₦{product.price}
+              </td>
 
-              <th className="border p-4 text-left">
-                Product Name
-              </th>
+              <td className="p-4">
 
-              <th className="border p-4 text-left">
-                Current Stock
-              </th>
+                <span
+                  className={
+                    Number(product.stock) <=
+                    Number(
+                      product.reorder_level ||
+                        20
+                    )
+                      ? "text-red-600 font-bold"
+                      : "text-green-600 font-bold"
+                  }
+                >
+                  {Number(product.stock) <=
+                  Number(
+                    product.reorder_level ||
+                      20
+                  )
+                    ? "Low Stock"
+                    : "In Stock"}
+                </span>
 
-              <th className="border p-4 text-left">
-                Unit Price
-              </th>
-
-              <th className="border p-4 text-left">
-                Status
-              </th>
+              </td>
 
             </tr>
+          )
+        )}
 
-          </thead>
+      </tbody>
 
-          <tbody>
+    </table>
 
-            {products.map((product) => (
+  </div>
 
-              <tr
-                key={product.id}
-                className="hover:bg-gray-50"
-              >
-
-                <td className="border p-4 font-medium">
-
-                  {product.name}
-
-                </td>
-
-                <td className="border p-4">
-
-                  {product.stock}
-
-                </td>
-
-                <td className="border p-4">
-
-                  ₦{product.price}
-
-                </td>
-
-                <td className="border p-4">
-
-                  <span
-                    className={
-                      product.stock <= 20
-
-                        ? "text-red-600 font-bold"
-
-                        : "text-green-600 font-bold"
-                    }
-                  >
-
-                    {product.stock <= 20
-                      ? "Low Stock"
-                      : "In Stock"}
-
-                  </span>
-
-                </td>
-
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
-    </div>
-  );
+</div>
+);
 }
