@@ -176,33 +176,68 @@ if (selectedProductData) {
        FIND MATERIALS
     ========================== */
 
-    const flour =
-      inventory?.find(
-        (item) =>
-          item.name ===
-          "Flour"
-      );
+const flour =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Flour"
+  );
 
-    const sugar =
-      inventory?.find(
-        (item) =>
-          item.name ===
-          "Sugar"
-      );
+const sugar =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Sugar"
+  );
 
-    const butter =
-      inventory?.find(
-        (item) =>
-          item.name ===
-          "Butter"
-      );
+const butter =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Butter"
+  );
 
-    const yeast =
-      inventory?.find(
-        (item) =>
-          item.name ===
-          "Yeast"
-      );
+const yeast =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Yeast"
+  );
+
+const resins =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Resins"
+  );
+
+const brown =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Brown"
+  );
+
+const groundnutOil =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Groundnut Oil"
+  );
+
+const tape =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Tape"
+  );
+
+const twist =
+  inventory?.find(
+    (item) =>
+      item.name ===
+      "Twist"
+  );
 
     /* =========================
        PRODUCT OUTPUT RATIOS
@@ -249,26 +284,42 @@ if (selectedProductData) {
        CALCULATE RATIO
     ========================== */
 
-    const productionRatio =
-      Number(
-        quantityProduced
-      ) / standardOutput;
-
+const productionRatio =
+  Number(quantityProduced) /
+  standardOutput;
     /* =========================
-       MATERIAL USAGE
-    ========================== */
+   MATERIAL USAGE
+========================== */
 
-    const flourUsed =
-      2 * productionRatio;
+const bagRatio =
+  Number(flourBagsUsed || 0) / 200;
 
-    const sugarUsed =
-      12 * productionRatio;
+const flourUsed =
+  Number(flourBagsUsed || 0);
 
-    const butterUsed =
-      1 * productionRatio;
+const sugarUsed =
+  1200 * bagRatio;
 
-    const yeastUsed =
-      0.5 * productionRatio;
+const butterUsed =
+  135 * bagRatio;
+
+const yeastUsed =
+  50 * bagRatio;
+
+const resinsUsed =
+  40 * bagRatio;
+
+const brownUsed =
+  83 * bagRatio;
+
+const groundnutOilUsed =
+  25 * bagRatio;
+
+const tapeUsed =
+  400 * bagRatio;
+
+const twistUsed =
+  8 * bagRatio;
 
     /* =========================
        UPDATE INVENTORY
@@ -349,6 +400,91 @@ if (selectedProductData) {
           yeast.id
         );
     }
+
+    if (resins) {
+
+  await supabase
+    .from("inventory")
+    .update({
+      quantity:
+        Number(
+          resins.quantity
+        ) -
+        (4 * productionRatio),
+    })
+    .eq(
+      "id",
+      resins.id
+    );
+}
+
+if (brown) {
+
+  await supabase
+    .from("inventory")
+    .update({
+      quantity:
+        Number(
+          brown.quantity
+        ) -
+        (0.83 * productionRatio),
+    })
+    .eq(
+      "id",
+      brown.id
+    );
+}
+
+if (groundnutOil) {
+
+  await supabase
+    .from("inventory")
+    .update({
+      quantity:
+        Number(
+          groundnutOil.quantity
+        ) -
+        (0.25 * productionRatio),
+    })
+    .eq(
+      "id",
+      groundnutOil.id
+    );
+}
+
+if (tape) {
+
+  await supabase
+    .from("inventory")
+    .update({
+      quantity:
+        Number(
+          tape.quantity
+        ) -
+        (20 * productionRatio),
+    })
+    .eq(
+      "id",
+      tape.id
+    );
+}
+
+if (twist) {
+
+  await supabase
+    .from("inventory")
+    .update({
+      quantity:
+        Number(
+          twist.quantity
+        ) -
+        (0.4 * productionRatio),
+    })
+    .eq(
+      "id",
+      twist.id
+    );
+}
 
     /* =========================
        RESET
