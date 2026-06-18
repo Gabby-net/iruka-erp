@@ -603,23 +603,6 @@ if (selectedProductData) {
 
 <input
   type="number"
-
-  placeholder="Flour Bags Used"
-
-  value={flourBagsUsed}
-
-  onChange={(e) =>
-    setFlourBagsUsed(
-      e.target.value
-    )
-  }
-
-  className="border-2 p-4 rounded-2xl"
-/>
-            {/* FLOUR BAGS USED */}
-
-<input
-  type="number"
   placeholder="Flour Bags Used"
 
   value={flourBagsUsed}
