@@ -29,6 +29,8 @@ export default function ProductionPage() {
 
   const [wasteQuantity, setWasteQuantity] =
     useState("");
+    const [flourBagsUsed, setFlourBagsUsed] =
+  useState("");
 
   /* =========================
      LOAD DATA
@@ -114,6 +116,9 @@ await supabase
       bread: selectedProduct,
       quantity: Number(quantityProduced),
       waste_quantity: Number(wasteQuantity || 0),
+
+flour_bags_used:
+  Number(flourBagsUsed || 0),
       produced_by: "Production Staff",
       batch: "IRK-" + Date.now(),
       shift,
@@ -594,6 +599,39 @@ if (selectedProductData) {
 
               className="border-2 p-4 rounded-2xl"
             />
+            {/* FLOUR BAGS USED */}
+
+<input
+  type="number"
+
+  placeholder="Flour Bags Used"
+
+  value={flourBagsUsed}
+
+  onChange={(e) =>
+    setFlourBagsUsed(
+      e.target.value
+    )
+  }
+
+  className="border-2 p-4 rounded-2xl"
+/>
+            {/* FLOUR BAGS USED */}
+
+<input
+  type="number"
+  placeholder="Flour Bags Used"
+
+  value={flourBagsUsed}
+
+  onChange={(e) =>
+    setFlourBagsUsed(
+      e.target.value
+    )
+  }
+
+  className="border-2 p-4 rounded-2xl"
+/>
 
           </div>
 
