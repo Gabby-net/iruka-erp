@@ -23,6 +23,11 @@ export default function InventoryPage() {
 
   const [unit, setUnit] =
     useState("");
+  const [supplier, setSupplier] =
+  useState("");
+
+const [invoiceNumber, setInvoiceNumber] =
+  useState("");  
 
   useEffect(() => {
 
@@ -54,20 +59,56 @@ export default function InventoryPage() {
      ADD INVENTORY
   ========================== */
 
-  async function addInventory() {
+async function addInventory() {
 
-    if (
-      !name ||
-      !quantity ||
-      !unit
-    ) {
+  if (
+    !name ||
+    !quantity
+  ) {
 
-      alert(
-        "Fill all fields"
+    alert(
+      "Fill all fields"
+    );
+
+    return;
+  }
+
+  const existingMaterial =
+    inventory.find(
+      (item) =>
+        item.name
+          .toLowerCase()
+          .trim() ===
+        name
+          .toLowerCase()
+          .trim()
+    );
+
+  if (
+    existingMaterial
+  ) {
+
+    const newQuantity =
+      Number(
+        existingMaterial.quantity
+      ) +
+      Number(quantity);
+
+    await supabase
+
+      .from("inventory")
+
+      .update({
+        quantity:
+          newQuantity,
+      })
+
+      .eq(
+        "id",
+        existingMaterial.id
       );
 
-      return;
-    }
+  } else {
 
     await supabase
 
@@ -81,19 +122,48 @@ export default function InventoryPage() {
           unit,
         },
       ]);
-
-    setName("");
-
-    setQuantity("");
-
-    setUnit("");
-
-    fetchInventory();
-
-    alert(
-      "Inventory added successfully"
-    );
   }
+
+  await supabase
+
+    .from(
+      "inventory_transactions"
+    )
+
+    .insert([
+      {
+        material_name:
+          name,
+
+        transaction_type:
+          "RECEIVED",
+
+        quantity:
+          Number(quantity),
+
+        supplier,
+
+        invoice_number:
+          invoiceNumber,
+      },
+    ]);
+
+  setName("");
+
+  setQuantity("");
+
+  setUnit("");
+
+  setSupplier("");
+
+  setInvoiceNumber("");
+
+  fetchInventory();
+
+  alert(
+    "Inventory received successfully"
+  );
+}
 
   /* =========================
      LOW STOCK CHECKER
@@ -182,7 +252,7 @@ export default function InventoryPage() {
 
         {/* SUMMARY */}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
           {/* TOTAL MATERIALS */}
 
@@ -291,7 +361,7 @@ export default function InventoryPage() {
 
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
             <input
               type="text"
@@ -337,6 +407,35 @@ export default function InventoryPage() {
 
               className="border-2 p-4 rounded-2xl"
             />
+            <input
+  type="text"
+  placeholder="Supplier"
+
+  value={supplier}
+
+  onChange={(e) =>
+    setSupplier(
+      e.target.value
+    )
+  }
+
+  className="border-2 p-4 rounded-2xl"
+/>
+
+<input
+  type="text"
+  placeholder="Invoice Number"
+
+  value={invoiceNumber}
+
+  onChange={(e) =>
+    setInvoiceNumber(
+      e.target.value
+    )
+  }
+
+  className="border-2 p-4 rounded-2xl"
+/>
 
           </div>
 
