@@ -124,29 +124,22 @@ async function addInventory() {
       ]);
   }
 
-  await supabase
+await supabase
 
-    .from(
-      "inventory_transactions"
-    )
+  .from("inventory_transactions")
 
-    .insert([
-      {
-        material_name:
-          name,
+  .insert([
+    {
+      material_name: name,
 
-        transaction_type:
-          "RECEIVED",
+      quantity_used: Number(quantity),
 
-        quantity:
-          Number(quantity),
+      transaction_type: "RECEIVED",
 
-        supplier,
-
-        invoice_number:
-          invoiceNumber,
-      },
-    ]);
+      reference:
+        invoiceNumber || "Stock Receipt",
+    },
+  ]);
 
   setName("");
 
