@@ -128,25 +128,39 @@ async function saveSale() {
     return;
   }
 
-  await supabase
-    .from("sales")
-    .insert([
-      {
-        product_name:
-          selectedProduct,
+await supabase
+  .from("sales")
+  .insert([
+    {
+      product_name:
+        selectedProduct,
 
-        quantity:
-          Number(quantity),
+      quantity:
+        Number(quantity),
 
-        unit_price:
-          Number(unitPrice),
+      unit_price:
+        Number(unitPrice),
 
-        total_amount:
-          totalAmount,
+      total_amount:
+        totalAmount,
 
-        cashier,
-      },
-    ]);
+      cashier,
+    },
+  ]);
+
+/* DEDUCT STOCK */
+
+await supabase
+  .from("products")
+  .update({
+    stock:
+      Number(product.stock) -
+      Number(quantity),
+  })
+  .eq(
+    "id",
+    product.id
+  );
 
   setSelectedProduct("");
   setQuantity("");
