@@ -331,7 +331,7 @@ const totalAmount =
 
             {/* UNIT PRICE */}
 
-            <div className="border-2 p-4 rounded-2xl bg-gray-50">
+<div className="border-2 p-4 rounded-2xl bg-gray-50">
 
   <p className="text-sm text-gray-500">
     Unit Price
@@ -340,6 +340,18 @@ const totalAmount =
   <p className="text-2xl font-bold text-green-700">
     ₦{unitPrice.toLocaleString()}
   </p>
+
+  <div className="mt-3 border-t pt-3">
+
+    <p className="text-sm text-gray-500">
+      Available Stock
+    </p>
+
+    <p className="text-xl font-bold text-blue-900">
+      {selectedProductData?.stock || 0}
+    </p>
+
+  </div>
 
 </div>
 
