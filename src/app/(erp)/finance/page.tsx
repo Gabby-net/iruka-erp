@@ -14,6 +14,15 @@ export default function FinancePage() {
   const [expenses, setExpenses] =
     useState<any[]>([]);
 
+    const [debtors, setDebtors] =
+  useState<any[]>([]);
+
+  const [paymentAmount, setPaymentAmount] =
+  useState("");
+
+const [selectedDebtor, setSelectedDebtor] =
+  useState<any>(null);
+
   const [title, setTitle] =
     useState("");
 
@@ -31,6 +40,12 @@ export default function FinancePage() {
 
   const [netProfit, setNetProfit] =
     useState(0);
+
+    const [totalDebtors, setTotalDebtors] =
+  useState(0);
+
+  const [outstandingBalance, setOutstandingBalance] =
+  useState(0);
 
   useEffect(() => {
 
@@ -116,6 +131,34 @@ export default function FinancePage() {
     setNetProfit(
       revenue - expenseTotal
     );
+
+    const debtorList =
+  (salesData || []).filter(
+    (sale) =>
+      Number(sale.balance) > 0
+  );
+
+setTotalDebtors(
+  debtorList.length
+);
+
+const totalOutstanding =
+  debtorList.reduce(
+    (sum, sale) =>
+      sum +
+      Number(
+        sale.balance || 0
+      ),
+    0
+  );
+
+  setDebtors(
+  debtorList
+);
+
+setOutstandingBalance(
+  totalOutstanding
+);
   }
 
   async function addExpense() {
@@ -188,7 +231,7 @@ export default function FinancePage() {
 
         {/* KPI CARDS */}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
 
           {/* REVENUE */}
 
@@ -246,6 +289,39 @@ export default function FinancePage() {
             </p>
 
           </div>
+
+          <div className="bg-white rounded-3xl shadow p-8">
+
+  <h2 className="text-gray-500 text-lg">
+
+    Outstanding Balance
+
+  </h2>
+
+  <p className="text-5xl font-black text-orange-600 mt-4">
+
+    ₦
+    {outstandingBalance.toLocaleString()}
+
+  </p>
+
+</div>
+
+<div className="bg-white rounded-3xl shadow p-8">
+
+  <h2 className="text-gray-500 text-lg">
+
+    Total Debtors
+
+  </h2>
+
+  <p className="text-5xl font-black text-red-600 mt-4">
+
+    {totalDebtors}
+
+  </p>
+
+</div>
 
         </div>
 
@@ -352,6 +428,12 @@ export default function FinancePage() {
 
                   </th>
 
+                  <th className="p-4 text-left">
+
+  Action
+
+</th>
+
                 </tr>
 
               </thead>
@@ -407,8 +489,150 @@ export default function FinancePage() {
 
         </div>
 
-      </div>
+<div className="bg-white rounded-3xl shadow p-8 mt-10">
 
-    </ProtectedRoute>
+  <h2 className="text-3xl font-bold mb-6">
+
+    Debtors List
+
+  </h2>
+
+  <div className="overflow-x-auto">
+
+  <table className="w-full">
+
+    <thead>
+
+      <tr className="border-b bg-gray-50">
+
+        <th className="p-4 text-left">
+
+          Invoice
+
+        </th>
+
+        <th className="p-4 text-left">
+
+          Customer
+
+        </th>
+
+        <th className="p-4 text-left">
+
+          Balance
+
+        </th>
+
+        <th className="p-4 text-left">
+
+          Date
+
+        </th>
+
+      </tr>
+
+    </thead>
+
+    <tbody>
+
+  {debtors.map(
+    (debtor) => (
+
+      <tr
+        key={debtor.id}
+        className="border-b hover:bg-gray-50"
+      >
+
+        <td className="p-4">
+
+          {debtor.invoice_number}
+
+        </td>
+
+        <td className="p-4 font-semibold">
+
+          {debtor.customer_name}
+
+        </td>
+
+        <td className="p-4 text-red-600 font-bold">
+
+          ₦
+          {Number(
+            debtor.balance || 0
+          ).toLocaleString()}
+
+        </td>
+
+        <td className="p-4">
+
+          {new Date(
+            debtor.created_at
+          ).toLocaleString()}
+
+        </td>
+
+      </tr>
+
+    )
+  )}
+
+</tbody>
+
+    <tbody>
+
+  {debtors.map(
+    (debtor) => (
+
+      <tr
+        key={debtor.id}
+        className="border-b hover:bg-gray-50"
+      >
+
+        <td className="p-4">
+
+          {debtor.invoice_number}
+
+        </td>
+
+        <td className="p-4 font-semibold">
+
+          {debtor.customer_name}
+
+        </td>
+
+        <td className="p-4 text-red-600 font-bold">
+
+          ₦
+          {Number(
+            debtor.balance || 0
+          ).toLocaleString()}
+
+        </td>
+
+        <td className="p-4">
+
+          {new Date(
+            debtor.created_at
+          ).toLocaleString()}
+
+        </td>
+
+      </tr>
+
+    )
+  )}
+
+</tbody>
+
+  </table>
+
+</div>
+
+</div>
+
+</div>
+
+</ProtectedRoute>
   );
 }
