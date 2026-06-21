@@ -1,4 +1,5 @@
 "use client";
+// Stock deduction deployment test
 
 import { useEffect, useState } from "react";
 
