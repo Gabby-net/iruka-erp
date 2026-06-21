@@ -97,55 +97,67 @@ const totalAmount =
      SAVE SALE
   ========================== */
 
-  async function saveSale() {
+async function saveSale() {
 
-    if (
-  !selectedProduct ||
-  !quantity ||
-  !cashier
-) {
-
-      alert(
-        "Fill all fields"
-      );
-
-      return;
-    }
-
-    await supabase
-
-      .from("sales")
-
-      .insert([
-        {
-          product_name:
-            selectedProduct,
-
-          quantity:
-            Number(quantity),
-
-          unit_price:
-            Number(unitPrice),
-
-          total_amount:
-            totalAmount,
-
-          cashier,
-        },
-      ]);
-
-    setSelectedProduct("");
-
-    setQuantity("");
-
-    setCashier("");
-
-    fetchData();
-
-    alert(
-      "Sale recorded successfully"
-    );
+  if (
+    !selectedProduct ||
+    !quantity ||
+    !cashier
+  ) {
+    alert("Fill all fields");
+    return;
   }
+
+  const product = products.find(
+    (p) =>
+      p.name === selectedProduct
+  );
+
+  if (!product) {
+    alert("Product not found");
+    return;
+  }
+
+  if (
+    Number(quantity) >
+    Number(product.stock)
+  ) {
+    alert(
+      `Only ${product.stock} units available`
+    );
+    return;
+  }
+
+  await supabase
+    .from("sales")
+    .insert([
+      {
+        product_name:
+          selectedProduct,
+
+        quantity:
+          Number(quantity),
+
+        unit_price:
+          Number(unitPrice),
+
+        total_amount:
+          totalAmount,
+
+        cashier,
+      },
+    ]);
+
+  setSelectedProduct("");
+  setQuantity("");
+  setCashier("");
+
+  fetchData();
+
+  alert(
+    "Sale recorded successfully"
+  );
+}
 
   /* =========================
      SUMMARY
