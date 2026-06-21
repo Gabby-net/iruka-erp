@@ -29,6 +29,14 @@ export default function SalesPage() {
 
   const [cashier, setCashier] =
     useState("");
+    const [customerName, setCustomerName] =
+  useState("");
+
+  const [amountPaid, setAmountPaid] =
+  useState("");
+
+  const [selectedSale, setSelectedSale] =
+  useState<any>(null);
 
   /* =========================
      LOAD DATA
@@ -94,6 +102,18 @@ const totalAmount =
   Number(quantity || 0) *
   unitPrice;
 
+  const balance =
+  totalAmount -
+  Number(amountPaid || 0);
+
+  const invoiceNumber =
+  `INV-${new Date()
+    .toISOString()
+    .slice(0, 10)
+    .replaceAll("-", "")}-${Math.floor(
+      Math.random() * 1000
+    )}`;
+
   /* =========================
      SAVE SALE
   ========================== */
@@ -133,6 +153,18 @@ await supabase
   .from("sales")
   .insert([
     {
+      customer_name:
+  customerName,
+
+  invoice_number:
+  invoiceNumber,
+
+  amount_paid:
+  Number(amountPaid),
+
+  balance:
+  balance,
+
       product_name:
         selectedProduct,
 
@@ -164,8 +196,10 @@ await supabase
   );
 
   setSelectedProduct("");
-  setQuantity("");
-  setCashier("");
+setQuantity("");
+setCashier("");
+setCustomerName("");
+setAmountPaid("");
 
   fetchData();
 
@@ -298,7 +332,17 @@ await supabase
 
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+
+<input
+  type="text"
+  placeholder="Customer Name"
+  value={customerName}
+  onChange={(e) =>
+    setCustomerName(e.target.value)
+  }
+  className="border-2 p-4 rounded-2xl"
+/>
 
             {/* PRODUCT */}
 
@@ -399,6 +443,17 @@ await supabase
 
               className="border-2 p-4 rounded-2xl"
             />
+            <input
+  type="number"
+  placeholder="Amount Paid"
+  value={amountPaid}
+  onChange={(e) =>
+    setAmountPaid(
+      e.target.value
+    )
+  }
+  className="border-2 p-4 rounded-2xl"
+/>
 
           </div>
 
@@ -418,6 +473,23 @@ await supabase
               {totalAmount.toLocaleString()}
 
             </p>
+            <p className="mt-4 text-lg text-gray-600">
+
+  Amount Paid:
+  ₦
+  {Number(
+    amountPaid || 0
+  ).toLocaleString()}
+
+</p>
+
+<p className="mt-2 text-xl font-bold text-red-600">
+
+  Balance:
+  ₦
+  {balance.toLocaleString()}
+
+</p>
 
           </div>
 
@@ -454,6 +526,14 @@ await supabase
                 <tr className="border-b bg-gray-50">
 
                   <th className="p-4 text-left">
+  Invoice
+</th>
+
+<th className="p-4 text-left">
+  Customer
+</th>
+
+                  <th className="p-4 text-left">
 
                     Product
 
@@ -464,6 +544,14 @@ await supabase
                     Quantity
 
                   </th>
+
+                  <th className="p-4 text-left">
+  Paid
+</th>
+
+<th className="p-4 text-left">
+  Balance
+</th>
 
                   <th className="p-4 text-left">
 
@@ -489,6 +577,10 @@ await supabase
 
                   </th>
 
+                  <th className="p-4 text-left">
+  Receipt
+</th>
+
                 </tr>
 
               </thead>
@@ -502,6 +594,17 @@ await supabase
                       key={sale.id}
                       className="border-b hover:bg-gray-50"
                     >
+<td className="p-4">
+
+  {sale.invoice_number}
+
+</td>
+
+<td className="p-4">
+
+  {sale.customer_name}
+
+</td>
 
                       <td className="p-4 font-semibold">
 
@@ -518,6 +621,24 @@ await supabase
                         }
 
                       </td>
+
+                      <td className="p-4 text-blue-700">
+
+  ₦
+  {Number(
+    sale.amount_paid || 0
+  ).toLocaleString()}
+
+</td>
+
+<td className="p-4 text-red-600 font-bold">
+
+  ₦
+  {Number(
+    sale.balance || 0
+  ).toLocaleString()}
+
+</td>
 
                       <td className="p-4">
 
@@ -553,6 +674,21 @@ await supabase
 
                       </td>
 
+                      <td className="p-4">
+
+  <button
+    onClick={() =>
+      setSelectedSale(
+        sale
+      )
+    }
+    className="bg-blue-950 text-white px-4 py-2 rounded-lg"
+  >
+    View Receipt
+  </button>
+
+</td>
+
                     </tr>
                   )
                 )}
@@ -566,6 +702,96 @@ await supabase
         </div>
 
       </div>
+
+{selectedSale && (
+
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+    <div className="bg-white rounded-3xl p-8 w-[500px] shadow-2xl">
+
+      <h1 className="text-2xl font-black text-center text-blue-950">
+
+        NKIRUKA / IRUKA INDUSTRIES LTD
+
+      </h1>
+
+      <div className="mt-6 space-y-3">
+
+        <p>
+          <strong>Invoice:</strong>{" "}
+          {selectedSale.invoice_number}
+        </p>
+
+        <p>
+          <strong>Customer:</strong>{" "}
+          {selectedSale.customer_name}
+        </p>
+
+        <p>
+          <strong>Product:</strong>{" "}
+          {selectedSale.product_name}
+        </p>
+
+        <p>
+          <strong>Quantity:</strong>{" "}
+          {selectedSale.quantity}
+        </p>
+
+        <p>
+          <strong>Total:</strong> ₦
+          {Number(
+            selectedSale.total_amount
+          ).toLocaleString()}
+        </p>
+
+        <p>
+          <strong>Paid:</strong> ₦
+          {Number(
+            selectedSale.amount_paid || 0
+          ).toLocaleString()}
+        </p>
+
+        <p>
+          <strong>Balance:</strong> ₦
+          {Number(
+            selectedSale.balance || 0
+          ).toLocaleString()}
+        </p>
+
+        <p>
+          <strong>Cashier:</strong>{" "}
+          {selectedSale.cashier}
+        </p>
+
+      </div>
+
+      <div className="flex gap-4 mt-8">
+
+        <button
+          onClick={() =>
+            window.print()
+          }
+          className="bg-green-700 text-white px-6 py-3 rounded-xl"
+        >
+          Print Receipt
+        </button>
+
+        <button
+          onClick={() =>
+            setSelectedSale(null)
+          }
+          className="bg-gray-300 px-6 py-3 rounded-xl"
+        >
+          Close
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+)}
 
     </ProtectedRoute>
   );
