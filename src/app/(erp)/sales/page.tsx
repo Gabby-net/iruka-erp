@@ -24,8 +24,7 @@ export default function SalesPage() {
   const [quantity, setQuantity] =
     useState("");
 
-  const [unitPrice, setUnitPrice] =
-    useState("");
+
 
   const [cashier, setCashier] =
     useState("");
@@ -79,9 +78,20 @@ export default function SalesPage() {
      TOTAL
   ========================== */
 
-  const totalAmount =
-    Number(quantity || 0) *
-    Number(unitPrice || 0);
+  const selectedProductData =
+  products.find(
+    (product) =>
+      product.name === selectedProduct
+  );
+
+const unitPrice =
+  Number(
+    selectedProductData?.price || 0
+  );
+
+const totalAmount =
+  Number(quantity || 0) *
+  unitPrice;
 
   /* =========================
      SAVE SALE
@@ -90,11 +100,10 @@ export default function SalesPage() {
   async function saveSale() {
 
     if (
-      !selectedProduct ||
-      !quantity ||
-      !unitPrice ||
-      !cashier
-    ) {
+  !selectedProduct ||
+  !quantity ||
+  !cashier
+) {
 
       alert(
         "Fill all fields"
@@ -128,8 +137,6 @@ export default function SalesPage() {
     setSelectedProduct("");
 
     setQuantity("");
-
-    setUnitPrice("");
 
     setCashier("");
 
@@ -324,21 +331,17 @@ export default function SalesPage() {
 
             {/* UNIT PRICE */}
 
-            <input
-              type="number"
+            <div className="border-2 p-4 rounded-2xl bg-gray-50">
 
-              placeholder="Unit Price"
+  <p className="text-sm text-gray-500">
+    Unit Price
+  </p>
 
-              value={unitPrice}
+  <p className="text-2xl font-bold text-green-700">
+    ₦{unitPrice.toLocaleString()}
+  </p>
 
-              onChange={(e) =>
-                setUnitPrice(
-                  e.target.value
-                )
-              }
-
-              className="border-2 p-4 rounded-2xl"
-            />
+</div>
 
             {/* CASHIER */}
 
