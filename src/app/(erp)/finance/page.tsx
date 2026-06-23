@@ -41,6 +41,15 @@ const [selectedDebtor, setSelectedDebtor] =
   const [netProfit, setNetProfit] =
     useState(0);
 
+  const [todayRevenue, setTodayRevenue] =
+  useState(0);
+
+const [todayExpenses, setTodayExpenses] =
+  useState(0);
+
+const [todayProfit, setTodayProfit] =
+  useState(0);  
+
     const [totalDebtors, setTotalDebtors] =
   useState(0);
 
@@ -131,6 +140,60 @@ const [selectedDebtor, setSelectedDebtor] =
     setNetProfit(
       revenue - expenseTotal
     );
+
+    const today =
+  new Date()
+    .toISOString()
+    .split("T")[0];
+
+const todaySales =
+  (salesData || []).filter(
+    (sale) =>
+      sale.created_at?.startsWith(
+        today
+      )
+  );
+
+const todayExpenseList =
+  (expenseData || []).filter(
+    (expense) =>
+      expense.created_at?.startsWith(
+        today
+      )
+  );
+
+const todayRevenueTotal =
+  todaySales.reduce(
+    (sum, sale) =>
+      sum +
+      Number(
+        sale.total_amount || 0
+      ),
+    0
+  );
+
+const todayExpenseTotal =
+  todayExpenseList.reduce(
+    (sum, expense) =>
+      sum +
+      Number(
+        expense.amount || 0
+      ),
+    0
+  );
+
+setTodayRevenue(
+  todayRevenueTotal
+);
+
+setTodayExpenses(
+  todayExpenseTotal
+);
+
+setTodayProfit(
+  todayRevenueTotal -
+    todayExpenseTotal
+);
 
     const debtorList =
   (salesData || []).filter(
@@ -231,7 +294,7 @@ setOutstandingBalance(
 
         {/* KPI CARDS */}
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
 
           {/* REVENUE */}
 
@@ -320,6 +383,48 @@ setOutstandingBalance(
     {totalDebtors}
 
   </p>
+
+  <div className="bg-white rounded-3xl shadow p-8">
+
+  <h2 className="text-gray-500 text-lg">
+    Today's Revenue
+  </h2>
+
+  <p className="text-5xl font-black text-green-600 mt-4">
+
+    ₦{todayRevenue.toLocaleString()}
+
+  </p>
+
+</div>
+
+<div className="bg-white rounded-3xl shadow p-8">
+
+  <h2 className="text-gray-500 text-lg">
+    Today's Expenses
+  </h2>
+
+  <p className="text-5xl font-black text-red-600 mt-4">
+
+    ₦{todayExpenses.toLocaleString()}
+
+  </p>
+
+</div>
+
+<div className="bg-white rounded-3xl shadow p-8">
+
+  <h2 className="text-gray-500 text-lg">
+    Today's Profit
+  </h2>
+
+  <p className="text-5xl font-black text-blue-950 mt-4">
+
+    ₦{todayProfit.toLocaleString()}
+
+  </p>
+
+</div>
 
 </div>
 
