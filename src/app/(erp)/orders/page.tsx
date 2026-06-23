@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
