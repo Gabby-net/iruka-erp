@@ -66,6 +66,11 @@ const menuByRole = {
   href: "/finance",
   icon: Receipt,
 },
+{
+  name: "Debtors",
+  href: "/debtors",
+  icon: Wallet,
+},
     {
       name: "Analytics",
       href: "/analytics",
