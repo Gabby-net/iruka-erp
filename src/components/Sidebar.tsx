@@ -37,10 +37,10 @@ const menuByRole = {
       icon: LayoutDashboard,
     },
     {
-      name: "Orders",
-      href: "/orders",
-      icon: ShoppingCart,
-    },
+  name: "Customer Orders",
+  href: "/orders",
+  icon: ShoppingCart,
+},
     {
       name: "Sales",
       href: "/sales",

@@ -1,396 +1,185 @@
 "use client";
 
-"use client";
-
 import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function OrdersPage() {
+export default function OrderDetailsPage() {
+  const params = useParams();
+  const router = useRouter();
 
-  const [stock, setStock] =
-    useState<Record<string, number>>({});
+  const [order, setOrder] =
+    useState<any>(null);
 
-  const [orders, setOrders] =
+  const [items, setItems] =
     useState<any[]>([]);
 
   const [loading, setLoading] =
     useState(true);
 
-  const [customer, setCustomer] =
-    useState("");
-
-  const [bread, setBread] =
-    useState("Jumbo Iruka");
-
-  const [quantity, setQuantity] =
-    useState(1);
-
-  const [price, setPrice] =
-    useState(0);
-
-  /* =========================
-     FETCH ORDERS
-  ========================== */
-
   useEffect(() => {
+    if (params?.id) {
+      fetchOrder();
+    }
+  }, [params?.id]);
 
-    fetchOrders();
+  async function fetchOrder() {
+    setLoading(true);
 
-    fetchStock();
-
-  }, []);
-
-  async function fetchOrders() {
-
-    const { data, error } =
+    const { data: orderData } =
       await supabase
         .from("orders")
         .select("*")
-        .order("id", {
-          ascending: false,
-        });
+        .eq("id", params.id)
+        .single();
 
-    if (error) {
+    if (orderData) {
+      setOrder(orderData);
 
-      console.error(error);
+      const {
+        data: itemData,
+      } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq(
+          "order_id",
+          orderData.id
+        );
 
-    } else {
-
-      setOrders(data || []);
+      setItems(itemData || []);
     }
 
     setLoading(false);
   }
 
-  async function fetchStock() {
-
-    const { data, error } =
-      await supabase
-        .from("products")
-        .select("name, stock");
-
-    if (error) {
-
-      console.error(error);
-      return;
-    }
-
-    const stockMap: Record<string, number> = {};
-
-    (data || []).forEach((item) => {
-
-      stockMap[item.name] =
-        item.stock || 0;
-
-    });
-
-    setStock(stockMap);
-
-    if (!bread && data?.length) {
-
-      setBread(data[0].name);
-
-    }
-  }
-
-  /* =========================
-     SAVE ORDER
-  ========================== */
-  /* =========================
-     SAVE ORDER
-  ========================== */
-
-  async function saveOrder() {
-
-    if (!customer) {
-
-      alert("Enter customer name");
-
-      return;
-    }
-
-    if (quantity <= 0) {
-
-      alert("Invalid quantity");
-
-      return;
-    }
-
-    /* GET REAL PRODUCT */
-
-    const {
-      data: productData,
-    } = await supabase
-      .from("products")
-      .select("*")
-      .eq("name", bread)
-      .single();
-
-    const availableStock =
-      productData?.stock || 0;
-
-    /* CHECK STOCK */
-
-    if (quantity > availableStock) {
-
-      alert(
-        `Only ${availableStock} ${bread} available`
-      );
-
-      return;
-    }
-
-    const total =
-      quantity * price;
-
-    const newOrder = {
-
-      customer,
-
-      bread,
-
-      quantity,
-
-      price,
-
-      total,
-
-      status: "Completed",
-    };
-
-    const { error } =
-      await supabase
-        .from("orders")
-        .insert([newOrder]);
-
-    if (error) {
-
-      console.error(error);
-
-    } else {
-
-      /* UPDATE REAL DATABASE STOCK */
-
-      await supabase
-        .from("products")
-        .update({
-          stock:
-            availableStock - quantity,
-        })
-        .eq("name", bread);
-
-      fetchOrders();
-fetchStock();
-
-      /* RESET */
-
-      setCustomer("");
-
-      setQuantity(1);
-
-      setPrice(0);
-    }
-  }
-
-  /* =========================
-     TOTALS
-  ========================== */
-
-  const totalRevenue =
-    orders.reduce(
-      (sum, item) =>
-        sum + Number(item.total),
-      0
-    );
-
-  const totalOrders =
-    orders.length;
-
   if (loading) {
-
     return (
-      <div className="p-6">
-        Loading Orders...
+      <div className="p-10">
+        Loading Order...
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="p-10">
+        Order Not Found
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="p-10 bg-gray-100 min-h-screen">
 
-      {/* HEADER */}
+      <button
+        onClick={() =>
+          router.push("/orders")
+        }
+        className="mb-6 bg-blue-950 text-white px-6 py-3 rounded-xl"
+      >
+        Back To Orders
+      </button>
 
-      <div>
+      <div className="bg-white rounded-3xl shadow p-8">
 
-        <h1 className="text-4xl font-bold">
-          Orders & Sales
+        <h1 className="text-4xl font-black text-blue-950 mb-8">
+          Customer Order Details
         </h1>
 
-        <p className="text-gray-500 mt-2">
-          Manage bakery customer orders
-        </p>
+        <div className="grid md:grid-cols-2 gap-6">
+
+          <div>
+
+            <h3 className="font-bold text-gray-500">
+              Customer Name
+            </h3>
+
+            <p className="text-2xl font-bold">
+              {order.customer_name}
+            </p>
+
+          </div>
+
+          <div>
+
+            <h3 className="font-bold text-gray-500">
+              Phone
+            </h3>
+
+            <p className="text-2xl font-bold">
+              {order.phone || "-"}
+            </p>
+
+          </div>
+
+          <div>
+
+            <h3 className="font-bold text-gray-500">
+              Order Number
+            </h3>
+
+            <p className="text-xl font-bold">
+              {order.order_number}
+            </p>
+
+          </div>
+
+          <div>
+
+            <h3 className="font-bold text-gray-500">
+              Delivery Date
+            </h3>
+
+            <p className="text-xl font-bold">
+              {order.delivery_date || "-"}
+            </p>
+
+          </div>
+
+          <div>
+
+            <h3 className="font-bold text-gray-500">
+              Payment Status
+            </h3>
+
+            <p className="text-xl font-bold text-green-700">
+              {order.payment_status}
+            </p>
+
+          </div>
+
+          <div>
+
+            <h3 className="font-bold text-gray-500">
+              Order Status
+            </h3>
+
+            <p className="text-xl font-bold text-orange-600">
+              {order.order_status}
+            </p>
+
+          </div>
+
+        </div>
+
+        <div className="mt-8">
+
+          <h3 className="font-bold text-gray-500">
+            Notes
+          </h3>
+
+          <p className="mt-2">
+            {order.notes || "No notes"}
+          </p>
+
+        </div>
 
       </div>
 
-      {/* STATS */}
+      <div className="bg-white rounded-3xl shadow p-8 mt-8">
 
-      <div className="grid md:grid-cols-3 gap-6">
-
-        <div className="bg-white p-6 rounded-2xl shadow">
-
-          <p className="text-gray-500">
-            Total Orders
-          </p>
-
-          <h2 className="text-3xl font-bold mt-2">
-
-            {totalOrders}
-
-          </h2>
-
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow">
-
-          <p className="text-gray-500">
-            Total Revenue
-          </p>
-
-          <h2 className="text-3xl font-bold text-green-600 mt-2">
-
-            ₦{totalRevenue.toLocaleString()}
-
-          </h2>
-
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow">
-
-          <p className="text-gray-500">
-            Available Products
-          </p>
-
-          <h2 className="text-3xl font-bold text-blue-600 mt-2">
-
-            {Object.keys(stock).length}
-
-          </h2>
-
-        </div>
-
-      </div>
-
-      {/* ORDER FORM */}
-
-      <div className="bg-white p-6 rounded-2xl shadow">
-
-        <h2 className="text-2xl font-bold mb-6">
-          Create Order
-        </h2>
-
-        <div className="grid md:grid-cols-4 gap-4">
-
-          <input
-            type="text"
-            placeholder="Customer Name"
-            value={customer}
-            onChange={(e) =>
-              setCustomer(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
-
-          <select
-            value={bread}
-            onChange={(e) =>
-              setBread(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          >
-
-            {Object.keys(stock).map(
-              (breadName) => (
-
-                <option
-                  key={breadName}
-                >
-                  {breadName}
-                </option>
-
-              )
-            )}
-
-          </select>
-
-          <input
-            type="number"
-            placeholder="Quantity"
-            value={quantity}
-            onChange={(e) =>
-              setQuantity(
-                Number(
-                  e.target.value
-                )
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
-
-          <input
-            type="number"
-            placeholder="Unit Price"
-            value={price}
-            onChange={(e) =>
-              setPrice(
-                Number(
-                  e.target.value
-                )
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
-
-        </div>
-
-        {/* STOCK */}
-
-        <div className="mt-4">
-
-          <p className="text-sm text-gray-500">
-
-            Available Stock:
-
-            <span className="font-bold ml-2">
-
-              {stock[bread] || 0}
-
-            </span>
-
-          </p>
-
-        </div>
-
-        <button
-          onClick={saveOrder}
-          className="mt-6 bg-black text-white px-6 py-3 rounded-xl"
-        >
-
-          Complete Order
-
-        </button>
-
-      </div>
-
-      {/* SALES HISTORY */}
-
-      <div className="bg-white p-6 rounded-2xl shadow overflow-x-auto">
-
-        <h2 className="text-2xl font-bold mb-6">
-          Sales History
+        <h2 className="text-3xl font-bold mb-6">
+          Ordered Products
         </h2>
 
         <table className="w-full">
@@ -399,28 +188,20 @@ fetchStock();
 
             <tr className="border-b">
 
-              <th className="text-left py-4">
-                Customer
+              <th className="text-left p-4">
+                Bread Type
               </th>
 
-              <th className="text-left py-4">
-                Bread
+              <th className="text-left p-4">
+                Quantity
               </th>
 
-              <th className="text-left py-4">
-                Qty
+              <th className="text-left p-4">
+                Unit Price
               </th>
 
-              <th className="text-left py-4">
-                Price
-              </th>
-
-              <th className="text-left py-4">
+              <th className="text-left p-4">
                 Total
-              </th>
-
-              <th className="text-left py-4">
-                Status
               </th>
 
             </tr>
@@ -429,41 +210,33 @@ fetchStock();
 
           <tbody>
 
-            {orders.map((item) => (
+            {items.map((item) => (
 
               <tr
                 key={item.id}
                 className="border-b"
               >
 
-                <td className="py-4">
-                  {item.customer}
+                <td className="p-4">
+                  {item.bread_type}
                 </td>
 
-                <td>
-                  {item.bread}
-                </td>
-
-                <td>
+                <td className="p-4">
                   {item.quantity}
                 </td>
 
-                <td>
-                  ₦{item.price}
+                <td className="p-4">
+                  ₦
+                  {Number(
+                    item.unit_price
+                  ).toLocaleString()}
                 </td>
 
-                <td className="font-bold">
-                  ₦{item.total}
-                </td>
-
-                <td>
-
-                  <span className="text-green-600 font-bold">
-
-                    {item.status}
-
-                  </span>
-
+                <td className="p-4 font-bold text-green-700">
+                  ₦
+                  {Number(
+                    item.total_amount
+                  ).toLocaleString()}
                 </td>
 
               </tr>
@@ -473,6 +246,19 @@ fetchStock();
           </tbody>
 
         </table>
+
+        <div className="mt-8 text-right">
+
+          <h2 className="text-4xl font-black text-green-700">
+
+            ₦
+            {Number(
+              order.total_amount || 0
+            ).toLocaleString()}
+
+          </h2>
+
+        </div>
 
       </div>
 
