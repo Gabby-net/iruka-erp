@@ -359,6 +359,60 @@ const [password, setPassword] = useState("");
 
         </div>
 
+        <div className="grid md:grid-cols-3 gap-6 mb-10">
+
+  <div className="bg-white p-6 rounded-3xl shadow">
+
+    <p>Total Staff</p>
+
+    <h2 className="text-4xl font-black text-blue-950">
+      {staff.length}
+    </h2>
+
+  </div>
+
+  <div className="bg-white p-6 rounded-3xl shadow">
+
+    <p>Total Debt</p>
+
+    <h2 className="text-4xl font-black text-red-600">
+
+      ₦{
+        debts
+          .reduce(
+            (sum, d) =>
+              sum + Number(d.amount),
+            0
+          )
+          .toLocaleString()
+      }
+
+    </h2>
+
+  </div>
+
+  <div className="bg-white p-6 rounded-3xl shadow">
+
+    <p>Monthly Salary Bill</p>
+
+    <h2 className="text-4xl font-black text-green-700">
+
+      ₦{
+        staff
+          .reduce(
+            (sum, s) =>
+              sum + Number(s.salary),
+            0
+          )
+          .toLocaleString()
+      }
+
+    </h2>
+
+  </div>
+
+</div>
+
         {/* ADD STAFF */}
 
         <div className="bg-white rounded-3xl shadow p-8 mb-10">
@@ -600,6 +654,10 @@ const [password, setPassword] = useState("");
                   </th>
 
                   <th className="p-4 text-left">
+  Role
+</th>
+
+                  <th className="p-4 text-left">
 
                     Salary
 
@@ -665,6 +723,10 @@ const [password, setPassword] = useState("");
                           }
 
                         </td>
+
+                        <td className="p-4">
+  {member.role}
+</td>
 
                         <td className="p-4 text-green-700 font-bold">
 

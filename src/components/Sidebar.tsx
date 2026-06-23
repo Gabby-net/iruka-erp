@@ -82,6 +82,11 @@ const menuByRole = {
       icon: Users,
     },
     {
+  name: "Payroll",
+  href: "/payroll",
+  icon: Wallet,
+},
+    {
       name: "Settings",
       href: "/settings",
       icon: Settings,
