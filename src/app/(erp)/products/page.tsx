@@ -139,13 +139,13 @@ return ( <div className="space-y-8">
 
         <tr className="bg-gray-100">
 
-          <th className="p-4 text-left">
-            SKU
-          </th>
+<th className="p-4 text-left">
+  Image
+</th>
 
-          <th className="p-4 text-left">
-            Product
-          </th>
+<th className="p-4 text-left">
+  Product
+</th>
 
           <th className="p-4 text-left">
             Stock
@@ -172,14 +172,39 @@ return ( <div className="space-y-8">
               key={product.id}
               className="border-b hover:bg-gray-50"
             >
-
               <td className="p-4">
-                {product.sku || "-"}
-              </td>
+  <img
+    src={
+      product.image_url ||
+      "https://via.placeholder.com/60"
+    }
+    alt={product.name}
+    className="w-16 h-16 object-cover rounded-lg border"
+  />
+</td>
 
-              <td className="p-4 font-semibold">
-                {product.name}
-              </td>
+
+<td className="p-4">
+  <div className="flex items-center gap-3">
+
+    <img
+      src={product.image_url}
+      alt={product.name}
+      className="w-14 h-14 rounded-lg object-cover border border-gray-200"
+    />
+
+    <div>
+      <p className="font-semibold">
+        {product.name}
+      </p>
+
+      <p className="text-xs text-gray-500">
+        {product.sku || "No SKU"}
+      </p>
+    </div>
+
+  </div>
+</td>
 
               <td className="p-4">
                 {product.stock}
