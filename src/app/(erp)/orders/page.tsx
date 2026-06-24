@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -224,15 +225,32 @@ export default function OrdersPage() {
 
         {/* HEADER */}
 
-        <div className="mb-10">
-          <h1 className="text-5xl font-black text-blue-950">
-            Customer Orders
-          </h1>
+<div className="flex items-center gap-4 mb-6">
 
-          <p className="text-gray-600 mt-2 text-lg">
-            Manage customer bookings, bulk orders and future deliveries
-          </p>
-        </div>
+  <Image
+    src="/logo/nkiruka-logo.png"
+    alt="NKIRUKA Logo"
+    width={60}
+    height={60}
+  />
+
+  <div>
+
+    <h1 className="text-4xl font-bold">
+
+      Customer Orders
+
+    </h1>
+
+    <p className="text-gray-500">
+
+      NKIRUKA / IRUKA INDUSTRIES LTD
+
+    </p>
+
+  </div>
+
+</div>
 
         {/* SUMMARY CARDS */}
 

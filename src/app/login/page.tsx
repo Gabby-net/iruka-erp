@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { useState } from "react";
 
 import { supabase } from "@/lib/supabase";
@@ -161,21 +163,29 @@ ${error.message}`
 
         {/* HEADER */}
 
-        <div className="mb-10 text-center">
+<div className="mb-10 text-center">
 
-          <h1 className="text-5xl font-black text-blue-950">
+  <Image
+    src="/logo/nkiruka-logo.png"
+    alt="NKIRUKA Logo"
+    width={120}
+    height={120}
+    className="mx-auto mb-4"
+  />
 
-            IRUKA ERP
+  <h1 className="text-4xl font-black text-blue-950">
 
-          </h1>
+    NKIRUKA / IRUKA ERP
 
-          <p className="text-gray-500 mt-3 text-lg">
+  </h1>
 
-            Enterprise Bakery Management System
+  <p className="text-gray-500 mt-2">
 
-          </p>
+    INDUSTRIES LTD
 
-        </div>
+  </p>
+
+</div>
 
         {/* FORM */}
 

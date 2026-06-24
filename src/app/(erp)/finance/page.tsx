@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import Image from "next/image";
+
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import { supabase } from "@/lib/supabase";
@@ -276,21 +278,32 @@ setOutstandingBalance(
 
         {/* HEADER */}
 
-        <div className="mb-10">
+<div className="flex items-center gap-4 mb-8">
 
-          <h1 className="text-5xl font-black text-blue-950">
+  <Image
+    src="/logo/nkiruka-logo.png"
+    alt="NKIRUKA Logo"
+    width={70}
+    height={70}
+  />
 
-            Finance & Profit Center
+  <div>
 
-          </h1>
+    <h1 className="text-4xl font-black text-blue-950">
 
-          <p className="text-gray-600 mt-2 text-lg">
+      Finance Dashboard
 
-            Enterprise accounting and profitability system
+    </h1>
 
-          </p>
+    <p className="text-gray-500">
 
-        </div>
+      NKIRUKA / IRUKA INDUSTRIES LTD
+
+    </p>
+
+  </div>
+
+</div>
 
         {/* KPI CARDS */}
 

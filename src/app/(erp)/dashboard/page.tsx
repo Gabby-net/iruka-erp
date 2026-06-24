@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { useEffect, useState } from "react";
 
 import {
@@ -165,7 +167,16 @@ return (
 
   {/* HEADER */}
 
-  <div className="flex justify-between items-center">
+ <div className="flex justify-between items-center">
+
+  <div className="flex items-center gap-4">
+
+    <Image
+      src="/logo/nkiruka-logo.png"
+      alt="NKIRUKA Logo"
+      width={70}
+      height={70}
+    />
 
     <div>
 
@@ -177,11 +188,13 @@ return (
 
       <p className="text-gray-500 mt-2">
 
-        IRUKA Bread Industries
+        NKIRUKA / IRUKA INDUSTRIES LTD
 
       </p>
 
     </div>
+
+  </div>
 
     <div className="bg-white shadow rounded-2xl px-6 py-4">
 

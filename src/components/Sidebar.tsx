@@ -207,15 +207,25 @@ const handleLogout = async () => {
           </div>
 
           {/* Logo */}
-          <div className="p-8 border-b border-white/10">
-            <h1 className="text-2xl font-black text-yellow-500">
-              IRUKA BREAD
-            </h1>
+<div className="p-6 border-b border-white/10 text-center">
 
-            <p className="text-sm text-gray-400 mt-1">
-              INDUSTRIES
-            </p>
-          </div>
+  <Image
+    src="/logo/nkiruka-logo.png"
+    alt="NKIRUKA Logo"
+    width={80}
+    height={80}
+    className="mx-auto mb-3"
+  />
+
+  <h1 className="text-lg font-black text-yellow-500">
+    NKIRUKA / IRUKA
+  </h1>
+
+  <p className="text-xs text-gray-400">
+    INDUSTRIES LTD
+  </p>
+
+</div>
 
           {/* User Card */}
           <div className="p-6">
