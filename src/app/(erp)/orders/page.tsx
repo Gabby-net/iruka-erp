@@ -111,6 +111,13 @@ export default function OrdersPage() {
       ? Number(product.price)
       : 0;
   }
+  function getProductDetails(
+  breadName: string
+) {
+  return products.find(
+    (p) => p.name === breadName
+  );
+}
 
   function calculateOrderTotal() {
     return orderItems.reduce(
@@ -446,17 +453,51 @@ export default function OrdersPage() {
                     className="border-2 p-4 rounded-2xl"
                   />
 
-                  <div className="border-2 p-4 rounded-2xl bg-gray-50 font-bold text-green-700">
-                    ₦
-                    {(
-                      getBreadPrice(
-                        item.bread_type
-                      ) *
-                      Number(
-                        item.quantity || 0
-                      )
-                    ).toLocaleString()}
-                  </div>
+<div className="border-2 p-4 rounded-2xl bg-white">
+
+  {item.bread_type && (
+
+    <div className="flex items-center gap-3">
+
+      <img
+        src={
+          getProductDetails(
+            item.bread_type
+          )?.image_url
+        }
+        alt={item.bread_type}
+        className="w-24 h-24 rounded-2xl object-contain bg-white p-2 border shadow-sm"
+      />
+
+      <div>
+
+        <p className="font-bold">
+          {item.bread_type}
+        </p>
+
+        <p className="text-sm text-gray-500">
+          ₦
+          {getBreadPrice(
+            item.bread_type
+          ).toLocaleString()}
+        </p>
+
+        <p className="text-xs text-green-600">
+          Stock:
+          {
+            getProductDetails(
+              item.bread_type
+            )?.stock
+          }
+        </p>
+
+      </div>
+
+    </div>
+
+  )}
+
+</div>
 
                   <button
                     type="button"
@@ -465,7 +506,7 @@ export default function OrdersPage() {
                         index
                       )
                     }
-                    className="bg-red-600 text-white rounded-2xl"
+                    className="bg-red-600 hover:bg-red-700 text-white rounded-2xl font-semibold transition"
                   >
                     Remove
                   </button>
@@ -479,7 +520,7 @@ export default function OrdersPage() {
           <button
             type="button"
             onClick={addOrderRow}
-            className="mt-6 bg-blue-950 text-white px-6 py-3 rounded-2xl"
+            className="mt-6 bg-blue-950 hover:bg-blue-900 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg transition"
           >
             Add Bread
           </button>
@@ -569,7 +610,7 @@ export default function OrdersPage() {
 
                     <tr
                       key={order.id}
-                      className="border-b"
+                      className="border-b hover:bg-slate-50 transition"
                     >
 
                       <td className="p-4">
@@ -596,7 +637,19 @@ export default function OrdersPage() {
                       </td>
 
                       <td className="p-4">
-
+<div
+  className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
+    order.payment_status === "Paid"
+      ? "bg-green-100 text-green-700"
+      : order.payment_status === "Partially Paid"
+      ? "bg-yellow-100 text-yellow-700"
+      : order.payment_status === "Refunded"
+      ? "bg-red-100 text-red-700"
+      : "bg-gray-100 text-gray-700"
+  }`}
+>
+  {order.payment_status}
+</div>
   <select
     value={
       order.payment_status || "Pending"
@@ -642,7 +695,21 @@ export default function OrdersPage() {
 </td>
 
                      <td className="p-4">
-
+<div
+  className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
+    order.order_status === "Delivered"
+      ? "bg-green-100 text-green-700"
+      : order.order_status === "Ready"
+      ? "bg-blue-100 text-blue-700"
+      : order.order_status === "Preparing"
+      ? "bg-yellow-100 text-yellow-700"
+      : order.order_status === "Cancelled"
+      ? "bg-red-100 text-red-700"
+      : "bg-gray-100 text-gray-700"
+  }`}
+>
+  {order.order_status}
+</div>
   <select
     value={
       order.order_status || "Pending"
