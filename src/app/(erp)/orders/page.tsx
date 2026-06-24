@@ -525,13 +525,13 @@ export default function OrdersPage() {
             Add Bread
           </button>
 
-          <div className="mt-8 bg-gray-100 p-6 rounded-2xl">
+          <div className="mt-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 p-8 rounded-3xl shadow-sm">
 
-            <h2 className="text-xl font-bold">
-              Order Total
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-600">
+  Order Total
+</h2>
 
-            <p className="text-5xl font-black text-green-700 mt-3">
+            <p className="text-6xl font-black text-green-700 mt-2">
               ₦
               {totalAmount.toLocaleString()}
             </p>
