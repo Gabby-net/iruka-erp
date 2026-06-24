@@ -63,59 +63,83 @@ Loading products... </div>
 return ( <div className="space-y-8">
 
 ```
+<div className="flex justify-between items-center">
+
   <div>
     <h1 className="text-4xl font-bold text-slate-900">
-      Products Management
+      Products
     </h1>
 
     <p className="text-gray-500 mt-2">
-      Bakery products and stock overview
+      Manage all bread products and inventory
     </p>
   </div>
 
-  <div className="grid md:grid-cols-4 gap-6">
+  <button className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg">
+    + Add Product
+  </button>
 
-    <div className="bg-white p-6 rounded-2xl shadow">
-      <p className="text-gray-500">
-        Total Products
-      </p>
+</div>
 
-      <h2 className="text-3xl font-bold mt-2">
-        {products.length}
-      </h2>
-    </div>
+<div className="grid grid-cols-1 md:grid-cols-4 gap-6">
 
-    <div className="bg-white p-6 rounded-2xl shadow">
-      <p className="text-gray-500">
-        Total Stock
-      </p>
+  <div className="bg-white rounded-3xl shadow-lg p-6 border border-gray-100">
+    <p className="text-sm text-gray-500">
+      Total Products
+    </p>
 
-      <h2 className="text-3xl font-bold text-green-600 mt-2">
-        {totalStock}
-      </h2>
-    </div>
+    <h2 className="text-4xl font-bold mt-2 text-slate-900">
+      {products.length}
+    </h2>
 
-    <div className="bg-white p-6 rounded-2xl shadow">
-      <p className="text-gray-500">
-        Low Stock
-      </p>
-
-      <h2 className="text-3xl font-bold text-red-600 mt-2">
-        {lowStockCount}
-      </h2>
-    </div>
-
-    <div className="bg-white p-6 rounded-2xl shadow">
-      <p className="text-gray-500">
-        Inventory Value
-      </p>
-
-      <h2 className="text-3xl font-bold text-blue-600 mt-2">
-        ₦{inventoryValue.toLocaleString()}
-      </h2>
-    </div>
-
+    <p className="text-xs text-gray-400 mt-2">
+      Active products in catalog
+    </p>
   </div>
+
+  <div className="bg-white rounded-3xl shadow-lg p-6 border border-gray-100">
+    <p className="text-sm text-gray-500">
+      Total Stock
+    </p>
+
+    <h2 className="text-4xl font-bold mt-2 text-green-600">
+      {totalStock.toLocaleString()}
+    </h2>
+
+    <p className="text-xs text-gray-400 mt-2">
+      Units in stock
+    </p>
+  </div>
+
+  <div className="bg-white rounded-3xl shadow-lg p-6 border border-gray-100">
+    <p className="text-sm text-gray-500">
+      Low Stock Items
+    </p>
+
+    <h2 className="text-4xl font-bold mt-2 text-orange-500">
+      {lowStockCount}
+    </h2>
+
+    <p className="text-xs text-gray-400 mt-2">
+      Requires attention
+    </p>
+  </div>
+
+  <div className="bg-white rounded-3xl shadow-lg p-6 border border-gray-100">
+    <p className="text-sm text-gray-500">
+      Inventory Value
+    </p>
+
+    <h2 className="text-3xl font-bold mt-2 text-blue-600">
+      ₦{inventoryValue.toLocaleString()}
+    </h2>
+
+    <p className="text-xs text-gray-400 mt-2">
+      Current stock value
+    </p>
+  </div>
+
+</div>
 
   <div className="bg-white rounded-2xl shadow p-4">
 
@@ -131,11 +155,11 @@ return ( <div className="space-y-8">
 
   </div>
 
-  <div className="bg-white rounded-2xl shadow overflow-hidden">
+  <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
 
     <table className="w-full">
 
-      <thead>
+      <thead className="bg-slate-50">
 
         <tr className="bg-gray-100">
 
@@ -187,11 +211,11 @@ return ( <div className="space-y-8">
 <td className="p-4">
   <div className="flex items-center gap-3">
 
-    <img
-      src={product.image_url}
-      alt={product.name}
-      className="w-14 h-14 rounded-lg object-cover border border-gray-200"
-    />
+<img
+  src={product.image_url}
+  alt={product.name}
+  className="w-20 h-20 rounded-xl object-contain bg-white p-1 border border-gray-200"
+/>
 
     <div>
       <p className="font-semibold">
