@@ -178,7 +178,7 @@ const handleLogout = async () => {
           fixed top-0 left-0 z-50
           w-[280px]
           h-screen
-          bg-[#0B1220] border-r border-slate-700/50 backdrop-blur-xl
+          bg-[#071028]
           text-white
           flex flex-col
           justify-between
@@ -207,7 +207,7 @@ const handleLogout = async () => {
           </div>
 
           {/* Logo */}
-<div className="p-8 border-b border-slate-700/40 text-center">
+<div className="p-6 border-b border-white/10 text-center">
 
   <Image
     src="/logo/nkiruka-logo.png"
@@ -229,7 +229,7 @@ const handleLogout = async () => {
 
           {/* User Card */}
           <div className="p-6">
-            <div className="bg-[#111827] border border-slate-700 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
+            <div className="bg-[#0d1838] rounded-2xl p-4 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-yellow-500 text-black font-black flex items-center justify-center">
                 A
               </div>
@@ -263,8 +263,8 @@ const handleLogout = async () => {
                   }
                   className={
                     active
-                      ? "flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold shadow-lg"
-                      : "flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-300 hover:bg-[#111827] hover:text-white transition-all duration-300"
+                      ? "flex items-center gap-4 px-5 py-4 rounded-2xl bg-yellow-500 text-black font-bold"
+                      : "flex items-center gap-4 px-5 py-4 rounded-2xl text-gray-300 hover:bg-[#0d1838] transition-all"
                   }
                 >
                   <Icon size={22} />
@@ -282,7 +282,7 @@ const handleLogout = async () => {
         <div className="p-6">
 <button
   onClick={handleLogout}
-  className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 rounded-2xl py-4 flex items-center justify-center gap-3 font-bold shadow-lg transition-all duration-300"
+  className="w-full bg-red-600 hover:bg-red-700 transition-all rounded-2xl py-4 flex items-center justify-center gap-3 font-bold"
 >
   <LogOut size={20} />
   Logout
