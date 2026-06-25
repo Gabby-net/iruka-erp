@@ -37,17 +37,13 @@ const COLORS = [
 
 export default function DashboardPage() {
 
-const [sales, setSales] =
-useState<any[]>([]);
+const [sales, setSales] = useState<any[]>([]);
+const [products, setProducts] = useState<any[]>([]);
+const [production, setProduction] = useState<any[]>([]);
+const [inventory, setInventory] = useState<any[]>([]);
 
-const [products, setProducts] =
-useState<any[]>([]);
-
-const [production, setProduction] =
-useState<any[]>([]);
-
-const [inventory, setInventory] =
-useState<any[]>([]);
+const [expenses, setExpenses] = useState<any[]>([]);
+const [debtors, setDebtors] = useState<any[]>([]);
 
 useEffect(() => {
 
@@ -77,6 +73,16 @@ const { data: inventoryData } =
     .from("inventory")
     .select("*");
 
+    const { data: expenseData } =
+await supabase
+.from("expenses")
+.select("*");
+
+const { data: debtorData } =
+await supabase
+.from("debtors")
+.select("*");
+
 setSales(salesData || []);
 
 setProducts(productData || []);
@@ -84,6 +90,10 @@ setProducts(productData || []);
 setProduction(productionData || []);
 
 setInventory(inventoryData || []);
+
+setExpenses(expenseData || []);
+
+setDebtors(debtorData || []);
 
 }
 
@@ -96,6 +106,31 @@ sale.total_amount || 0
 ),
 0
 );
+
+const totalExpenses =
+expenses.reduce(
+  (sum, item) =>
+    sum + Number(item.amount || 0),
+  0
+);
+
+const totalDebts =
+debtors.reduce(
+  (sum, item) =>
+    sum + Number(item.balance || 0),
+  0
+);
+
+const flourStock =
+inventory.find(
+  (item) =>
+    item.material_name
+      ?.toLowerCase()
+      .includes("flour")
+);
+
+const flourBags =
+Number(flourStock?.quantity || 0);
 
 const totalProduction =
 production.reduce(
@@ -259,17 +294,16 @@ return (
         <div>
 
           <p className="text-gray-500">
+  Expenses
+</p>
 
-            Orders
+<h2 className="text-4xl font-black text-blue-700 mt-3">
+  ₦{totalExpenses.toLocaleString()}
+</h2>
 
-          </p>
-
-          <h2 className="text-4xl font-black text-blue-700 mt-3">
-
-            {totalSales}
-
-          </h2>
-
+<p className="text-sm text-gray-400 mt-2">
+  Total business expenses
+</p>
         </div>
 
         <div className="bg-blue-100 p-4 rounded-2xl">
@@ -291,18 +325,17 @@ return (
 
         <div>
 
-          <p className="text-gray-500">
+<p className="text-gray-500">
+  Debts Owed
+</p>
 
-            Production
+<h2 className="text-4xl font-black text-orange-500 mt-3">
+  ₦{totalDebts.toLocaleString()}
+</h2>
 
-          </p>
-
-          <h2 className="text-4xl font-black text-yellow-500 mt-3">
-
-            {totalProduction}
-
-          </h2>
-
+<p className="text-sm text-gray-400 mt-2">
+  Outstanding customer balances
+</p>
         </div>
 
         <div className="bg-yellow-100 p-4 rounded-2xl">
@@ -324,17 +357,17 @@ return (
 
         <div>
 
-          <p className="text-gray-500">
+<p className="text-gray-500">
+  Flour Remaining
+</p>
 
-            Low Stock
+<h2 className="text-4xl font-black text-red-600 mt-3">
+  {flourBags} Bags
+</h2>
 
-          </p>
-
-          <h2 className="text-4xl font-black text-red-600 mt-3">
-
-            {lowStock}
-
-          </h2>
+<p className="text-sm text-gray-400 mt-2">
+  Available flour inventory
+</p>
 
         </div>
 
@@ -509,38 +542,92 @@ return (
 
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 
       {products.map((product) => (
 
         <div
           key={product.id}
-          className="border rounded-3xl p-6 hover:shadow-lg transition-all"
+          className="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-xl transition-all"
         >
 
-          <div className="h-36 rounded-2xl bg-gradient-to-r from-[#071028] to-[#1e3a8a] mb-5 flex items-center justify-center">
+          <div className="h-24 bg-gray-50 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
 
-            <h2 className="text-white text-2xl font-black">
-
-              {product.name}
-
-            </h2>
+<img
+  src={product.image_url}
+  alt={product.name}
+  className="max-h-20 object-contain transition-transform duration-300 hover:scale-105"
+/>
 
           </div>
 
           <div className="space-y-2">
 
-            <p className="text-gray-500">
+<h3 className="text-lg font-bold text-[#071028] mb-2">
+  {product.name}
+</h3>
 
-              Current Stock
+<span
+  className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+    Number(product.stock) <= 100
+      ? "bg-red-100 text-red-600"
+      : "bg-green-100 text-green-600"
+  }`}
+>
+  {Number(product.stock) <= 100
+    ? "Low Stock"
+    : "In Stock"}
+</span>
 
-            </p>
+<div>
 
-            <h2 className="text-4xl font-black text-[#071028]">
+  <h2 className="text-3xl font-black text-[#071028]">
+    {Number(product.stock || 0).toLocaleString()}
+  </h2>
 
-              {product.stock || 0}
+  <p className="text-sm text-gray-500">
+    Units Available
+  </p>
 
-            </h2>
+</div>
+
+<div className="flex justify-between items-center mt-3">
+
+  <span className="text-sm text-gray-500">
+    Price
+  </span>
+
+  <span className="font-bold text-green-600">
+    ₦{Number(product.price || 0).toLocaleString()}
+  </span>
+
+</div>
+
+<div className="mt-3">
+
+  <div className="w-full bg-gray-200 rounded-full h-2">
+
+    <div
+      className="bg-green-600 h-2 rounded-full"
+      style={{
+        width: `${Math.min(
+          (Number(product.stock || 0) / 5000) * 100,
+          100
+        )}%`,
+      }}
+    />
+
+  </div>
+
+</div>
+
+<div className="pt-2">
+
+  <button className="text-blue-700 font-semibold text-sm hover:underline">
+    View Product →
+  </button>
+
+</div>
 
           </div>
 
