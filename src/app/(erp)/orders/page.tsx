@@ -280,11 +280,10 @@ export default function OrdersPage() {
 
             <p className="text-5xl font-black text-orange-600 mt-4">
               {
-                orders.filter(
-                  (o) =>
-                    o.order_status ===
-                    "Pending"
-                ).length
+orders.filter(
+    (o) =>
+        o.order_status === "Completed"
+).length
               }
             </p>
           </div>
@@ -638,15 +637,30 @@ export default function OrdersPage() {
 
                       <td className="p-4">
 <div
-  className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
-    order.payment_status === "Paid"
-      ? "bg-green-100 text-green-700"
-      : order.payment_status === "Partially Paid"
-      ? "bg-yellow-100 text-yellow-700"
-      : order.payment_status === "Refunded"
-      ? "bg-red-100 text-red-700"
-      : "bg-gray-100 text-gray-700"
-  }`}
+className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
+  order.order_status === "Completed"
+    ? "bg-green-100 text-green-700"
+
+    : order.order_status === "Ready"
+    ? "bg-emerald-100 text-emerald-700"
+
+    : order.order_status === "Packaging"
+    ? "bg-indigo-100 text-indigo-700"
+
+    : order.order_status === "Baking"
+    ? "bg-yellow-100 text-yellow-700"
+
+    : order.order_status === "Preparing"
+    ? "bg-purple-100 text-purple-700"
+
+    : order.order_status === "Confirmed"
+    ? "bg-blue-100 text-blue-700"
+
+    : order.order_status === "Cancelled"
+    ? "bg-red-100 text-red-700"
+
+    : "bg-orange-100 text-orange-700"
+}`}
 >
   {order.payment_status}
 </div>
@@ -697,12 +711,12 @@ export default function OrdersPage() {
                      <td className="p-4">
 <div
   className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
-    order.order_status === "Delivered"
+    order.order_status === "Completed"
       ? "bg-green-100 text-green-700"
       : order.order_status === "Ready"
-      ? "bg-blue-100 text-blue-700"
+      ? "bg-emerald-100 text-emerald-700"
       : order.order_status === "Preparing"
-      ? "bg-yellow-100 text-yellow-700"
+      ? "bg-purple-100 text-purple-700"
       : order.order_status === "Cancelled"
       ? "bg-red-100 text-red-700"
       : "bg-gray-100 text-gray-700"
@@ -715,44 +729,67 @@ export default function OrdersPage() {
       order.order_status || "Pending"
     }
 
-    onChange={async (e) => {
+onChange={async (e) => {
 
-      await supabase
-        .from("orders")
-        .update({
-          order_status:
-            e.target.value,
-        })
-        .eq(
-          "id",
-          order.id
-        );
+  const newStatus = e.target.value;
 
-      fetchOrders();
-    }}
+  // Update order status
+  await supabase
+    .from("orders")
+    .update({
+      order_status: newStatus,
+    })
+    .eq("id", order.id);
+
+  // Only notify for important updates
+  if (
+    newStatus === "Confirmed" ||
+    newStatus === "Ready"
+  ) {
+
+    const title =
+      newStatus === "Confirmed"
+        ? "Order Confirmed"
+        : "Order Ready";
+
+    const message =
+      newStatus === "Confirmed"
+        ? `Your order ${order.order_number} has been confirmed.`
+        : `Good news! Your order ${order.order_number} is ready for pickup.`;
+
+    await supabase
+      .from("notifications")
+      .insert({
+        customer_id: order.customer_id,
+        title,
+        message,
+        is_read: false,
+      });
+
+  }
+
+  fetchOrders();
+
+}}
 
     className="border rounded-lg px-3 py-2"
   >
 
-    <option>
-      Pending
-    </option>
+<option>Pending</option>
 
-    <option>
-      Preparing
-    </option>
+<option>Confirmed</option>
 
-    <option>
-      Ready
-    </option>
+<option>Preparing</option>
 
-    <option>
-      Delivered
-    </option>
+<option>Baking</option>
 
-    <option>
-      Cancelled
-    </option>
+<option>Packaging</option>
+
+<option>Ready</option>
+
+<option>Completed</option>
+
+<option>Cancelled</option>
 
   </select>
 

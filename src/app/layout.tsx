@@ -7,7 +7,7 @@ import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 
 export const metadata = {
-  title: "NKIRUKA / IRUKA INDUSTRIES LTD ERP",
+  title: "NKIRUKA / IRUKA INDUSTRIES LTD",
   description:
     "Bakery Production Management System",
 };
