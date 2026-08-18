@@ -7,8 +7,9 @@ import { InventoryProvider } from "./context/InventoryContext";
 import { AuthProvider } from "./context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "IRUKA BREAD",
-  description: "Fresh Bread Ordering Platform",
+  title: "IRUKA ERP",
+  description:
+    "IRUKA ERP - Enterprise Resource Planning System for IRUKA Industries Ltd.",
 
   manifest: "/manifest",
 
@@ -25,6 +26,7 @@ export const metadata: Metadata = {
         type: "image/png",
       },
     ],
+
     apple: [
       {
         url: "/icons/apple-touch-icon.png",
@@ -36,23 +38,20 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "IRUKA BREAD",
+    title: "IRUKA ERP",
   },
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
       <body className="bg-[#081028]">
-
         <InventoryProvider>
-
           <AuthProvider>
-
             {children}
 
             <Toaster
@@ -69,16 +68,12 @@ export default function RootLayout({
                   border: "1px solid #1E3A8A",
                   borderRadius: "18px",
                   padding: "16px",
-                  boxShadow:
-                    "0 20px 60px rgba(0,0,0,.45)",
+                  boxShadow: "0 20px 60px rgba(0,0,0,.45)",
                 },
               }}
             />
-
           </AuthProvider>
-
         </InventoryProvider>
-
       </body>
     </html>
   );

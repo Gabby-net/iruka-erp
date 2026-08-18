@@ -2,14 +2,21 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "IRUKA BREAD",
-    short_name: "IRUKA",
-    description: "Fresh Bread Ordering Platform",
-    start_url: "/customer/home",
+    name: "IRUKA ERP",
+    short_name: "IRUKA ERP",
+    description:
+      "IRUKA ERP - Enterprise Resource Planning System for IRUKA Industries Ltd.",
+
+    start_url: "/login",
+    scope: "/",
+
     display: "standalone",
-    background_color: "#FFFDF8",
+
+    background_color: "#081028",
     theme_color: "#071028",
+
     orientation: "portrait",
+
     icons: [
       {
         src: "/icons/icon-192.png",
