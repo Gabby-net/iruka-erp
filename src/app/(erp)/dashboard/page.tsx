@@ -1,662 +1,1518 @@
 "use client";
 
-import Image from "next/image";
-
 import { useEffect, useState } from "react";
-
-import {
-ResponsiveContainer,
-LineChart,
-Line,
-XAxis,
-YAxis,
-Tooltip,
-CartesianGrid,
-PieChart,
-Pie,
-Cell,
-BarChart,
-Bar,
-} from "recharts";
-
-import {
-DollarSign,
-ShoppingCart,
-Factory,
-AlertTriangle,
-} from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 
+import {
+  DollarSign,
+  Wallet,
+  Users,
+  Wheat,
+  Trophy,
+  Crown,
+} from "lucide-react";
+
+import {
+ResponsiveContainer,
+AreaChart,
+Area,
+CartesianGrid,
+XAxis,
+YAxis,
+Tooltip,
+PieChart,
+Pie,
+Cell,
+Legend,
+} from "recharts";
+
 const COLORS = [
-"#1e3a8a",
-"#facc15",
-"#0f172a",
-"#2563eb",
+  "#3B82F6",
+  "#22C55E",
+  "#FACC15",
+  "#F97316",
+  "#8B5CF6",
+  "#EC4899",
 ];
 
 export default function DashboardPage() {
 
-const [sales, setSales] = useState<any[]>([]);
-const [products, setProducts] = useState<any[]>([]);
-const [production, setProduction] = useState<any[]>([]);
-const [inventory, setInventory] = useState<any[]>([]);
+  const router = useRouter();
 
-const [expenses, setExpenses] = useState<any[]>([]);
-const [debtors, setDebtors] = useState<any[]>([]);
+  /* ============================
+          DATABASE STATES
+  ============================ */
 
-useEffect(() => {
+  const [sales, setSales] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [debtors, setDebtors] = useState<any[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+const [showOrderModal, setShowOrderModal] = useState(false);
 
-fetchDashboard();
+  const [loading, setLoading] = useState(true);
 
-}, []);
+  /* ============================
+            FETCH DATA
+  ============================ */
 
-async function fetchDashboard() {
+  useEffect(() => {
 
-const { data: salesData } =
-  await supabase
-    .from("sales")
-    .select("*");
+    fetchDashboard();
 
-const { data: productData } =
-  await supabase
-    .from("products")
-    .select("*");
+  }, []);
 
-const { data: productionData } =
-  await supabase
-    .from("production_logs")
-    .select("*");
+  async function fetchDashboard() {
 
-const { data: inventoryData } =
-  await supabase
-    .from("inventory")
-    .select("*");
+    setLoading(true);
 
-    const { data: expenseData } =
-await supabase
-.from("expenses")
-.select("*");
+    try {
 
-const { data: debtorData } =
-await supabase
-.from("debtors")
-.select("*");
+const [
 
-setSales(salesData || []);
+  salesRes,
+  productRes,
+  inventoryRes,
+  expenseRes,
+  debtorRes,
+  ordersRes,
 
-setProducts(productData || []);
+] = await Promise.all([
 
-setProduction(productionData || []);
+        supabase
+          .from("sales")
+          .select("*"),
 
-setInventory(inventoryData || []);
+        supabase
+          .from("products")
+          .select("*"),
 
-setExpenses(expenseData || []);
+        supabase
+          .from("inventory")
+          .select("*"),
 
-setDebtors(debtorData || []);
+        supabase
+          .from("expenses")
+          .select("*"),
+
+        supabase
+  .from("orders")
+  .select("*")
+  .order("created_at", { ascending: false })
+  .limit(10),  
+
+        supabase
+          .from("debtors")
+          .select("*"),
+
+      ]);
+
+      setSales(salesRes.data || []);
+
+      setProducts(productRes.data || []);
+
+      setInventory(inventoryRes.data || []);
+
+      setExpenses(expenseRes.data || []);
+
+      setDebtors(debtorRes.data || []);
+
+      setRecentOrders(ordersRes.data || []);
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
+    setLoading(false);
+
+  }
+
+  /* ============================
+        KPI CALCULATIONS
+  ============================ */
+
+  const revenue = sales.reduce(
+
+    (sum, sale) =>
+
+      sum + Number(sale.total_amount || 0),
+
+    0
+
+  );
+
+  const totalExpenses = expenses.reduce(
+
+    (sum, expense) =>
+
+      sum + Number(expense.amount || 0),
+
+    0
+
+  );
+
+  const totalDebts = debtors.reduce(
+
+    (sum, debtor) =>
+
+      sum + Number(debtor.balance || 0),
+
+    0
+
+  );
+
+  const flour = inventory.find(
+
+    item =>
+
+      item.name?.toLowerCase().includes("flour")
+
+  );
+
+  const flourBags = Number(
+
+    flour?.quantity || 0
+
+  );
+
+  /* ============================
+        REVENUE GRAPH
+  ============================ */
+
+  const revenueChart = Object.values(
+
+    sales.reduce((acc: any, sale: any) => {
+
+      const day = new Date(
+
+        sale.created_at
+
+      ).toLocaleDateString(
+
+        "en-GB",
+
+        {
+
+          day: "numeric",
+
+          month: "short",
+
+        }
+
+      );
+
+      if (!acc[day]) {
+
+        acc[day] = {
+
+          day,
+
+          sales: 0,
+
+        };
+
+      }
+
+      acc[day].sales += Number(
+
+        sale.total_amount || 0
+
+      );
+
+      return acc;
+
+    }, {})
+
+  );
+
+  /* ============================
+      PRODUCT STOCK PIE CHART
+  ============================ */
+
+  const stockChart = products
+
+    .filter(
+
+      product =>
+
+        Number(product.stock) > 0
+
+    )
+
+    .map(product => ({
+
+      name: product.name,
+
+      value: Number(product.stock),
+
+    }));
+
+/* ============================
+      BEST SELLING PRODUCT
+============================ */
+
+type ProductSalesSummary = {
+  quantity: number;
+  revenue: number;
+};
+
+const productSales: Record<string, ProductSalesSummary> = {};
+
+sales.forEach((sale) => {
+
+  const productName = sale.product_name;
+
+  if (!productName) return;
+
+  if (!productSales[productName]) {
+
+    productSales[productName] = {
+      quantity: 0,
+      revenue: 0,
+    };
+
+  }
+
+  productSales[productName].quantity += Number(
+    sale.quantity || 0
+  );
+
+  productSales[productName].revenue += Number(
+    sale.total_amount || 0
+  );
+
+});
+
+const bestSellingProducts = Object.entries(productSales) as [
+  string,
+  ProductSalesSummary
+][];
+
+bestSellingProducts.sort(
+  (a, b) => b[1].quantity - a[1].quantity
+);
+
+const topProduct = bestSellingProducts[0];
+
+const bestProduct = products.find(
+  (product) => product.name === topProduct?.[0]
+);
+
+/* ============================
+        BEST CUSTOMER
+============================ */
+
+type CustomerSalesSummary = {
+  total: number;
+  orders: number;
+};
+
+const customerSales: Record<string, CustomerSalesSummary> = {};
+
+sales.forEach((sale) => {
+
+  const customerName =
+    sale.customer_name || "Walk-in Customer";
+
+  if (!customerSales[customerName]) {
+
+    customerSales[customerName] = {
+      total: 0,
+      orders: 0,
+    };
+
+  }
+
+  customerSales[customerName].total += Number(
+    sale.total_amount || 0
+  );
+
+  customerSales[customerName].orders += 1;
+
+});
+
+const bestCustomers = Object.entries(customerSales) as [
+  string,
+  CustomerSalesSummary
+][];
+
+bestCustomers.sort(
+  (a, b) => b[1].total - a[1].total
+);
+
+const topCustomer = bestCustomers[0];
+const averageOrderValue = topCustomer
+  ? topCustomer[1].total / topCustomer[1].orders
+  : 0;
+
+if (loading) {
+
+  return (
+
+    <div className="min-h-screen flex items-center justify-center bg-[#08111f]">
+
+      <h2 className="text-white text-2xl font-bold">
+
+        Loading Dashboard...
+
+      </h2>
+
+    </div>
+
+  );
 
 }
 
-const revenue =
-sales.reduce(
-(sum, sale) =>
-sum +
-Number(
-sale.total_amount || 0
-),
-0
-);
-
-const totalExpenses =
-expenses.reduce(
-  (sum, item) =>
-    sum + Number(item.amount || 0),
-  0
-);
-
-const totalDebts =
-debtors.reduce(
-  (sum, item) =>
-    sum + Number(item.balance || 0),
-  0
-);
-
-const flourStock =
-inventory.find(
-  (item) =>
-    item.material_name
-      ?.toLowerCase()
-      .includes("flour")
-);
-
-const flourBags =
-Number(flourStock?.quantity || 0);
-
-const totalProduction =
-production.reduce(
-(sum, item) =>
-sum +
-Number(
-item.quantity_produced || 0
-),
-0
-);
-
-const totalSales =
-sales.length;
-
-const lowStock =
-inventory.filter(
-(item) =>
-Number(item.quantity) < 10
-).length;
-
-const salesChartData = [
-{
-day: "Mon",
-sales: 120000,
-},
-
-{
-  day: "Tue",
-  sales: 180000,
-},
-
-{
-  day: "Wed",
-  sales: 150000,
-},
-
-{
-  day: "Thu",
-  sales: 250000,
-},
-
-{
-  day: "Fri",
-  sales: 300000,
-},
-
-{
-  day: "Sat",
-  sales: 400000,
-},
-
-{
-  day: "Sun",
-  sales: 280000,
-},
-];
-
-const productionChartData =
-products.map((product) => ({
-name: product.name,
-value: Number(
-product.stock || 0
-),
-}));
-
 return (
 
-<div className="space-y-8">
+<div className="min-h-screen bg-[#08111f] -m-6 p-8">
 
-  {/* HEADER */}
+      {/* ==========================================
+                EXECUTIVE HEADER
+      ========================================== */}
 
- <div className="flex justify-between items-center">
+      <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-8 mb-10">
 
-  <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
 
-    <Image
-      src="/logo/nkiruka-logo.png"
-      alt="NKIRUKA Logo"
-      width={70}
-      height={70}
-    />
-
-    <div>
-
-      <h1 className="text-xl md:text-4xl font-black text-[#071028] leading-tight">
-
-        Executive Dashboard
-
-      </h1>
-
-      <p className="text-gray-500 mt-2">
-
-        NKIRUKA / IRUKA INDUSTRIES LTD
-
-      </p>
-
-    </div>
-
-  </div>
-
-    <div className="bg-white shadow rounded-2xl px-6 py-4">
-
-      <p className="text-gray-500">
-
-        Today
-
-      </p>
-
-      <p className="font-bold text-[#071028]">
-
-        CEO Analytics Center
-
-      </p>
-
-    </div>
-
-  </div>
-
-  {/* KPI CARDS */}
-
-  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
-    <div className="bg-white rounded-3xl shadow p-6">
-
-      <div className="flex justify-between items-center">
-
-        <div>
-
-          <p className="text-gray-500">
-
-            Revenue
-
-          </p>
-
-          <h2 className="text-4xl font-black text-green-600 mt-3">
-
-            ₦
-            {revenue.toLocaleString()}
-
-          </h2>
-
-        </div>
-
-        <div className="bg-green-100 p-4 rounded-2xl">
-
-          <DollarSign
-            size={30}
-            className="text-green-600"
+          <Image
+            src="/logo/nkiruka-logo.png"
+            alt="NKIRUKA"
+            width={90}
+            height={90}
+            priority
           />
 
-        </div>
-
-      </div>
-
-    </div>
-
-    <div className="bg-white rounded-3xl shadow p-6">
-
-      <div className="flex justify-between items-center">
-
-        <div>
-
-          <p className="text-gray-500">
-  Expenses
-</p>
-
-<h2 className="text-4xl font-black text-blue-700 mt-3">
-  ₦{totalExpenses.toLocaleString()}
-</h2>
-
-<p className="text-sm text-gray-400 mt-2">
-  Total business expenses
-</p>
-        </div>
-
-        <div className="bg-blue-100 p-4 rounded-2xl">
-
-          <ShoppingCart
-            size={30}
-            className="text-blue-700"
-          />
-
-        </div>
-
-      </div>
-
-    </div>
-
-    <div className="bg-white rounded-3xl shadow p-6">
-
-      <div className="flex justify-between items-center">
-
-        <div>
-
-<p className="text-gray-500">
-  Debts Owed
-</p>
-
-<h2 className="text-4xl font-black text-orange-500 mt-3">
-  ₦{totalDebts.toLocaleString()}
-</h2>
-
-<p className="text-sm text-gray-400 mt-2">
-  Outstanding customer balances
-</p>
-        </div>
-
-        <div className="bg-yellow-100 p-4 rounded-2xl">
-
-          <Factory
-            size={30}
-            className="text-yellow-600"
-          />
-
-        </div>
-
-      </div>
-
-    </div>
-
-    <div className="bg-white rounded-3xl shadow p-6">
-
-      <div className="flex justify-between items-center">
-
-        <div>
-
-<p className="text-gray-500">
-  Flour Remaining
-</p>
-
-<h2 className="text-4xl font-black text-red-600 mt-3">
-  {flourBags} Bags
-</h2>
-
-<p className="text-sm text-gray-400 mt-2">
-  Available flour inventory
-</p>
-
-        </div>
-
-        <div className="bg-red-100 p-4 rounded-2xl">
-
-          <AlertTriangle
-            size={30}
-            className="text-red-600"
-          />
-
-        </div>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* CHARTS */}
-
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-    {/* SALES CHART */}
-
-    <div className="bg-white rounded-3xl shadow p-6">
-
-      <div className="mb-6">
-
-        <h2 className="text-2xl font-black text-[#071028]">
-
-          Revenue Analytics
-
-        </h2>
-
-        <p className="text-gray-500">
-
-          Weekly Sales Performance
-
-        </p>
-
-      </div>
-
-      <div className="h-[350px] w-full min-w-0">
-
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-        >
-
-          <LineChart
-            data={salesChartData}
-          >
-
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-            />
-
-            <XAxis dataKey="day" />
-
-            <YAxis />
-
-            <Tooltip />
-
-            <Line
-              type="monotone"
-              dataKey="sales"
-              stroke="#1e3a8a"
-              strokeWidth={4}
-            />
-
-          </LineChart>
-
-        </ResponsiveContainer>
-
-      </div>
-
-    </div>
-
-    {/* PIE CHART */}
-
-    <div className="bg-white rounded-3xl shadow p-6">
-
-      <div className="mb-6">
-
-        <h2 className="text-2xl font-black text-[#071028]">
-
-          Product Stock
-
-        </h2>
-
-        <p className="text-gray-500">
-
-          Available Bread Stock
-
-        </p>
-
-      </div>
-
-      <div className="h-[250px] md:h-[350px] w-full min-w-0">
-
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-        >
-
-          <PieChart>
-
-            <Pie
-              data={
-                productionChartData
-              }
-              dataKey="value"
-              nameKey="name"
-              outerRadius={120}
-              label
-            >
-
-              {productionChartData.map(
-                (
-                  entry,
-                  index
-                ) => (
-
-                  <Cell
-                    key={index}
-                    fill={
-                      COLORS[
-                        index %
-                          COLORS.length
-                      ]
-                    }
-                  />
-                )
-              )}
-
-            </Pie>
-
-            <Tooltip />
-
-          </PieChart>
-
-        </ResponsiveContainer>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* PRODUCT STOCK */}
-
-  <div className="bg-white rounded-3xl shadow p-6">
-
-    <div className="flex justify-between items-center mb-6">
-
-      <div>
-
-        <h2 className="text-2xl font-black text-[#071028]">
-
-          Product Inventory
-
-        </h2>
-
-        <p className="text-gray-500">
-
-          Finished Bread Stock
-
-        </p>
-
-      </div>
-
-    </div>
-
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-
-      {products.map((product) => (
-
-        <div
-          key={product.id}
-          className="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-xl transition-all"
-        >
-
-          <div className="h-24 bg-gray-50 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
-
-<img
-  src={product.image_url}
-  alt={product.name}
-  className="max-h-20 object-contain transition-transform duration-300 hover:scale-105"
-/>
-
-          </div>
-
-          <div className="space-y-2">
-
-<h3 className="text-lg font-bold text-[#071028] mb-2">
-  {product.name}
-</h3>
-
-<span
-  className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-    Number(product.stock) <= 100
-      ? "bg-red-100 text-red-600"
-      : "bg-green-100 text-green-600"
-  }`}
->
-  {Number(product.stock) <= 100
-    ? "Low Stock"
-    : "In Stock"}
-</span>
+          <div>
 
 <div>
 
-  <h2 className="text-3xl font-black text-[#071028]">
-    {Number(product.stock || 0).toLocaleString()}
-  </h2>
+  <p className="text-blue-400 text-lg font-semibold">
+    👋 Good Evening,
+  </p>
 
-  <p className="text-sm text-gray-500">
-    Units Available
+  <h1 className="text-5xl font-black text-white mt-2">
+    Chika
+  </h1>
+
+  <p className="text-slate-400 mt-2 text-lg">
+    Chief Executive Officer
+  </p>
+
+  <p className="text-slate-500 mt-1">
+    NKIRUKA / IRUKA INDUSTRIES LTD
   </p>
 
 </div>
 
-<div className="flex justify-between items-center mt-3">
+            <p className="text-slate-500 mt-1">
 
-  <span className="text-sm text-gray-500">
-    Price
-  </span>
+              Real-time Business Intelligence
 
-  <span className="font-bold text-green-600">
-    ₦{Number(product.price || 0).toLocaleString()}
-  </span>
-
-</div>
-
-<div className="mt-3">
-
-  <div className="w-full bg-gray-200 rounded-full h-2">
-
-    <div
-      className="bg-green-600 h-2 rounded-full"
-      style={{
-        width: `${Math.min(
-          (Number(product.stock || 0) / 5000) * 100,
-          100
-        )}%`,
-      }}
-    />
-
-  </div>
-
-</div>
-
-<div className="pt-2">
-
-  <button className="text-blue-700 font-semibold text-sm hover:underline">
-    View Product →
-  </button>
-
-</div>
+            </p>
 
           </div>
 
         </div>
-      ))}
+
+        <div className="bg-slate-900 border border-slate-700 rounded-3xl px-8 py-6 shadow-2xl">
+
+          <p className="text-slate-400">
+
+            Today
+
+          </p>
+
+          <h2 className="text-white text-2xl font-bold mt-1">
+
+            {new Date().toLocaleDateString(
+              "en-GB",
+              {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }
+            )}
+
+          </h2>
+
+          <p className="text-yellow-400 mt-2 font-semibold">
+
+            CEO Analytics Center
+
+          </p>
+
+        </div>
+
+      </div>
+
+      {/* ==========================================
+                  KPI CARDS
+      ========================================== */}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+
+        {/* Revenue */}
+
+        <div className="bg-gradient-to-br from-green-900 to-slate-900 rounded-3xl border border-green-700 shadow-2xl p-7">
+
+          <div className="flex justify-between">
+
+            <div>
+
+              <p className="text-green-300">
+
+                Total Revenue
+
+              </p>
+
+              <h2 className="text-4xl font-black text-white mt-4">
+
+                ₦{revenue.toLocaleString()}
+
+              </h2>
+
+              <p className="text-green-200 mt-3">
+
+                Sales Recorded
+
+              </p>
+
+            </div>
+
+            <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center">
+
+              <DollarSign
+                className="text-green-400"
+                size={34}
+              />
+
+            </div>
+
+          </div>
+
+          <div className="mt-6 text-sm text-green-300">
+
+            {sales.length} Transactions
+
+          </div>
+
+        </div>
+
+        {/* Expenses */}
+
+        <div className="bg-gradient-to-br from-blue-900 to-slate-900 rounded-3xl border border-blue-700 shadow-2xl p-7">
+
+          <div className="flex justify-between">
+
+            <div>
+
+              <p className="text-blue-300">
+
+                Expenses
+
+              </p>
+
+              <h2 className="text-4xl font-black text-white mt-4">
+
+                ₦{totalExpenses.toLocaleString()}
+
+              </h2>
+
+              <p className="text-blue-200 mt-3">
+
+                Total Expenses
+
+              </p>
+
+            </div>
+
+            <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center">
+
+              <Wallet
+                className="text-blue-400"
+                size={34}
+              />
+
+            </div>
+
+          </div>
+
+          <div className="mt-6 text-sm text-blue-300">
+
+            {expenses.length} Expense Records
+
+          </div>
+
+        </div>
+
+        {/* Debtors */}
+
+        <div className="bg-gradient-to-br from-yellow-900 to-slate-900 rounded-3xl border border-yellow-700 shadow-2xl p-7">
+
+          <div className="flex justify-between">
+
+            <div>
+
+              <p className="text-yellow-300">
+
+                Outstanding Debts
+
+              </p>
+
+              <h2 className="text-4xl font-black text-white mt-4">
+
+                ₦{totalDebts.toLocaleString()}
+
+              </h2>
+
+              <p className="text-yellow-200 mt-3">
+
+                Money Yet To Be Collected
+
+              </p>
+
+            </div>
+
+            <div className="w-16 h-16 rounded-2xl bg-yellow-500/20 flex items-center justify-center">
+
+              <Users
+                className="text-yellow-400"
+                size={34}
+              />
+
+            </div>
+
+          </div>
+
+          <div className="mt-6 text-sm text-yellow-300">
+
+            {debtors.length} Active Debtors
+
+          </div>
+
+        </div>
+
+        {/* Flour */}
+
+        <div className="bg-gradient-to-br from-red-900 to-slate-900 rounded-3xl border border-red-700 shadow-2xl p-7">
+
+          <div className="flex justify-between">
+
+            <div>
+
+              <p className="text-red-300">
+
+                Flour Remaining
+
+              </p>
+
+              <h2 className="text-4xl font-black text-white mt-4">
+
+                {flourBags.toLocaleString()} Bags
+
+              </h2>
+
+              <p className="text-red-200 mt-3">
+
+                Current Flour Inventory
+
+              </p>
+
+            </div>
+
+            <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center">
+
+              <Wheat
+                className="text-red-400"
+                size={34}
+              />
+
+            </div>
+
+          </div>
+
+          <div className="mt-6">
+
+            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+
+              <div
+                className={`h-full rounded-full ${
+                  flourBags > 100
+                    ? "bg-green-500"
+                    : flourBags > 50
+                    ? "bg-yellow-500"
+                    : "bg-red-500"
+                }`}
+                style={{
+                  width: `${Math.min(
+                    (flourBags / 200) * 100,
+                    100
+                  )}%`,
+                }}
+              />
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* ==========================================
+             ANALYTICS SECTION STARTS HERE
+      ========================================== */}
+
+            {/* ==========================================
+                ANALYTICS SECTION
+      ========================================== */}
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-10">
+
+{/* ==========================================
+        Revenue Analytics
+========================================== */}
+
+<div className="xl:col-span-5 bg-slate-900 border border-slate-700 rounded-3xl p-5 shadow-2xl">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <div>
+
+      <h2 className="text-3xl font-bold text-white">
+        Revenue Analytics
+      </h2>
+
+      <p className="text-slate-400 mt-2">
+        Live Revenue Performance
+      </p>
+
+    </div>
+
+    <div className="rounded-xl bg-blue-600 px-5 py-3 text-white font-semibold">
+      {revenueChart.length} Days
+    </div>
+
+  </div>
+
+  <div className="h-[220px]">
+
+    <ResponsiveContainer width="100%" height="100%">
+
+      <AreaChart data={revenueChart}>
+
+        <defs>
+
+          <linearGradient
+            id="revenueGradient"
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="1"
+          >
+
+            <stop
+              offset="5%"
+              stopColor="#3B82F6"
+              stopOpacity={0.8}
+            />
+
+            <stop
+              offset="95%"
+              stopColor="#3B82F6"
+              stopOpacity={0.05}
+            />
+
+          </linearGradient>
+
+        </defs>
+
+        <CartesianGrid
+          stroke="#334155"
+          strokeDasharray="4 4"
+        />
+
+        <XAxis
+          dataKey="day"
+          stroke="#94A3B8"
+        />
+
+        <YAxis
+          stroke="#94A3B8"
+        />
+
+        <Tooltip
+          contentStyle={{
+            background: "#0F172A",
+            border: "1px solid #334155",
+            borderRadius: "14px",
+            color: "#fff",
+          }}
+        />
+
+        <Area
+          type="monotone"
+          dataKey="sales"
+          stroke="#3B82F6"
+          strokeWidth={4}
+          fill="url(#revenueGradient)"
+        />
+
+      </AreaChart>
+
+    </ResponsiveContainer>
+
+  </div>
+
+  <div className="grid grid-cols-3 gap-5 mt-4">
+
+    <div className="rounded-2xl bg-[#0F172A] p-5">
+
+      <p className="text-slate-400 text-sm">
+        Today's Revenue
+      </p>
+
+      <h2 className="mt-2 text-3xl font-bold text-green-400">
+        ₦{revenue.toLocaleString()}
+      </h2>
+
+    </div>
+
+    <div className="rounded-2xl bg-[#0F172A] p-4">
+
+      <p className="text-slate-400 text-sm">
+        Sales Transactions
+      </p>
+
+      <h2 className="mt-2 text-3xl font-bold text-blue-400">
+        {sales.length}
+      </h2>
+
+    </div>
+
+    <div className="rounded-2xl bg-[#0F172A] p-5">
+
+      <p className="text-slate-400 text-sm">
+        Average Sale
+      </p>
+
+      <h2 className="mt-2 text-3xl font-bold text-yellow-400">
+        ₦
+        {sales.length > 0
+          ? Math.round(revenue / sales.length).toLocaleString()
+          : "0"}
+      </h2>
 
     </div>
 
   </div>
 
-  {/* RECENT SALES */}
+</div>
 
-  <div className="bg-white rounded-3xl shadow p-6">
+{/* ==========================================
+        Product Stock
+========================================== */}
 
-    <div className="mb-6">
+<div className="xl:col-span-4 rounded-3xl bg-[#111C44] border border-slate-700 p-8 shadow-2xl">
 
-      <h2 className="text-2xl font-black text-[#071028]">
+  <div className="flex justify-between items-center mb-6">
 
-        Recent Sales
+    <div>
+
+      <h2 className="text-3xl font-bold text-white">
+        Product Stock
+      </h2>
+
+      <p className="text-slate-400 mt-2">
+        Current Inventory Distribution
+      </p>
+
+    </div>
+
+  </div>
+
+  <div className="h-[170px]">
+
+    <ResponsiveContainer width="100%" height="100%">
+
+      <PieChart>
+
+        <Pie
+          data={stockChart}
+          dataKey="value"
+          nameKey="name"
+          innerRadius={70}
+          outerRadius={105}
+          paddingAngle={4}
+        >
+
+          {stockChart.map((entry, index) => (
+
+            <Cell
+              key={index}
+              fill={COLORS[index % COLORS.length]}
+            />
+
+          ))}
+
+        </Pie>
+
+        <Tooltip />
+
+      </PieChart>
+
+    </ResponsiveContainer>
+
+  </div>
+
+  <div className="grid grid-cols-2 gap-4 mt-6">
+
+    <div className="rounded-2xl bg-[#0F172A] p-5">
+
+      <p className="text-slate-400 text-sm">
+        Products
+      </p>
+
+      <h2 className="text-3xl font-bold text-blue-400 mt-2">
+        {products.length}
+      </h2>
+
+    </div>
+
+    <div className="rounded-2xl bg-[#0F172A] p-5">
+
+      <p className="text-slate-400 text-sm">
+        Total Stock
+      </p>
+
+      <h2 className="text-3xl font-bold text-green-400 mt-2">
+        {products.reduce(
+          (sum, p) => sum + Number(p.stock || 0),
+          0
+        )}
+      </h2>
+
+    </div>
+
+  </div>
+
+  <div className="mt-3 space-y-2">
+
+    {stockChart
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+      .map((item, index) => (
+
+        <div
+          key={index}
+          className="flex justify-between items-center rounded-xl bg-[#0F172A] px-4 py-2"
+        >
+
+          <div className="flex items-center gap-3">
+
+            <div
+              className="h-3 w-3 rounded-full"
+              style={{
+                background:
+                  COLORS[index % COLORS.length],
+              }}
+            />
+
+            <span className="text-white font-medium">
+              {item.name}
+            </span>
+
+          </div>
+
+          <span className="text-blue-400 font-bold">
+            {item.value}
+          </span>
+
+        </div>
+
+      ))}
+
+  </div>
+
+</div>
+
+        {/* ==========================================
+                RIGHT SIDE
+        ========================================== */}
+
+        <div className="xl:col-span-3 flex flex-col gap-6">
+
+          {/* ==========================================
+                  Best Selling Product
+          ========================================== */}
+
+          <div className="bg-slate-900 border border-yellow-600 rounded-3xl p-6 shadow-2xl">
+
+            <div className="flex items-center gap-3 mb-5">
+
+              <Trophy
+                className="text-yellow-400"
+                size={28}
+              />
+
+              <h2 className="text-xl font-bold text-white">
+
+                Best Selling Product
+
+              </h2>
+
+            </div>
+
+            <div className="flex gap-4">
+
+              <div className="w-24 h-24 rounded-2xl bg-slate-800 overflow-hidden flex items-center justify-center">
+
+                <img
+
+                  src={
+                    bestProduct?.image_url ||
+                    "/placeholder.png"
+                  }
+
+                  alt={bestProduct?.name}
+
+                  className="w-20 h-20 object-contain"
+
+                />
+
+              </div>
+
+              <div>
+
+                <h3 className="text-2xl font-bold text-white">
+
+                  {bestProduct?.name || "No Sales"}
+
+                </h3>
+
+                <p className="text-green-400 mt-2">
+
+                  #1 Best Seller
+
+                </p>
+
+<p className="text-slate-400 mt-4">
+
+  Units Sold
+
+</p>
+
+<h2 className="text-3xl font-black text-white">
+
+  {topProduct ? topProduct[1].quantity : 0}
+
+</h2>
+
+<div className="mt-5 border-t border-slate-700 pt-4">
+
+  <div className="flex justify-between">
+
+    <span className="text-slate-400">
+
+      Revenue
+
+    </span>
+
+    <span className="text-green-400 font-bold">
+
+      ₦{topProduct
+        ? Number(
+            topProduct[1].revenue
+          ).toLocaleString()
+        : "0"}
+
+    </span>
+
+  </div>
+
+  <div className="flex justify-between mt-3">
+
+    <span className="text-slate-400">
+
+      Avg Price
+
+    </span>
+
+    <span className="text-blue-400 font-bold">
+
+      ₦{topProduct
+        ? Math.round(
+            topProduct[1].revenue /
+            topProduct[1].quantity
+          ).toLocaleString()
+        : "0"}
+
+    </span>
+
+  </div>
+
+</div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* ==========================================
+                    Best Customer
+          ========================================== */}
+
+          <div className="bg-slate-900 border border-purple-700 rounded-3xl p-6 shadow-2xl">
+
+            <div className="flex items-center gap-3 mb-5">
+
+              <Crown
+                className="text-purple-400"
+                size={28}
+              />
+
+              <h2 className="text-xl font-bold text-white">
+
+                Best Customer
+
+              </h2>
+
+            </div>
+
+            <div className="flex items-center gap-5">
+
+              <div className="w-20 h-20 rounded-full bg-purple-600 flex items-center justify-center">
+
+                <Users
+                  className="text-white"
+                  size={34}
+                />
+
+              </div>
+
+              <div>
+
+<h3 className="text-xl font-bold text-white">
+
+  {topCustomer?.[0] ?? "No Customer"}
+
+</h3>
+
+                <p className="text-purple-300 mt-2">
+
+                  Top Customer
+
+                </p>
+
+<h2 className="text-2xl font-black text-white mt-3">
+
+₦{topCustomer
+  ? Number(topCustomer[1].total).toLocaleString()
+  : "0"}
+
+</h2>
+
+<div className="mt-4 border-t border-slate-700 pt-4">
+
+  <div className="flex justify-between">
+
+    <span className="text-slate-400">
+
+      Orders
+
+    </span>
+
+    <span className="text-white font-bold">
+
+      {topCustomer?.[1].orders ?? 0}
+
+    </span>
+
+  </div>
+
+  <div className="flex justify-between mt-3">
+
+    <span className="text-slate-400">
+
+      Avg Order
+
+    </span>
+
+    <span className="text-green-400 font-bold">
+
+      ₦{averageOrderValue.toLocaleString(undefined,{
+        maximumFractionDigits:0,
+      })}
+
+    </span>
+
+  </div>
+
+</div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* ==========================================
+            PRODUCT INVENTORY STARTS HERE
+      ========================================== */}
+
+            {/* ==========================================
+                PRODUCT INVENTORY
+      ========================================== */}
+
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-8 mb-10">
+
+        <div className="flex items-center justify-between mb-8">
+
+          <div>
+
+            <h2 className="text-3xl font-bold text-white">
+
+              Product Inventory
+
+            </h2>
+
+            <p className="text-slate-400 mt-2">
+
+              Live Finished Goods Inventory
+
+            </p>
+
+          </div>
+
+          <div className="bg-blue-600 px-5 py-3 rounded-xl">
+
+            <span className="text-white font-semibold">
+
+              {products.length} Products
+
+            </span>
+
+          </div>
+
+        </div>
+
+        {products.length === 0 ? (
+
+          <div className="text-center py-20">
+
+            <h2 className="text-white text-2xl font-bold">
+
+              No Products Found
+
+            </h2>
+
+            <p className="text-slate-400 mt-3">
+
+              Add products from the Products module.
+
+            </p>
+
+          </div>
+
+        ) : (
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+
+            {products.map((product) => {
+
+              const stock = Number(product.stock || 0);
+
+              const percentage = Math.min(
+
+                (stock / 5000) * 100,
+
+                100
+
+              );
+
+              return (
+
+                <div
+
+                  key={product.id}
+
+                  className="bg-[#111c2d] border border-slate-700 rounded-3xl overflow-hidden hover:border-blue-500 transition duration-300 hover:-translate-y-2"
+
+                >
+
+                  {/* Product Image */}
+
+                  <div className="bg-slate-800 h-44 flex items-center justify-center">
+
+                    <img
+
+                      src={
+
+                        product.image_url ||
+
+                        "/placeholder.png"
+
+                      }
+
+                      alt={product.name}
+
+                      className="h-32 object-contain"
+
+                    />
+
+                  </div>
+
+                  {/* Product Details */}
+
+                  <div className="p-5">
+
+                    <h3 className="text-xl font-bold text-white">
+
+                      {product.name}
+
+                    </h3>
+
+                    <p className="text-slate-400 text-sm mt-1">
+
+                      SKU:
+
+                      {" "}
+
+                      {product.sku || "N/A"}
+
+                    </p>
+
+                    <div className="mt-5">
+
+                      <span
+
+                        className={`px-3 py-1 rounded-full text-xs font-semibold
+
+                        ${
+
+                          stock > 300
+
+                            ? "bg-green-600/20 text-green-400"
+
+                            : stock > 100
+
+                            ? "bg-yellow-600/20 text-yellow-400"
+
+                            : "bg-red-600/20 text-red-400"
+
+                        }
+
+                        `}
+
+                      >
+
+                        {
+
+                          stock > 300
+
+                            ? "In Stock"
+
+                            : stock > 100
+
+                            ? "Running Low"
+
+                            : "Critical"
+
+                        }
+
+                      </span>
+
+                    </div>
+
+                    <div className="mt-5">
+
+                      <h2 className="text-4xl font-black text-white">
+
+                        {stock.toLocaleString()}
+
+                      </h2>
+
+                      <p className="text-slate-400">
+
+                        Units Available
+
+                      </p>
+
+                    </div>
+
+                    <div className="mt-5 flex justify-between">
+
+                      <span className="text-slate-400">
+
+                        Price
+
+                      </span>
+
+                      <span className="text-green-400 font-bold">
+
+                        ₦
+
+                        {Number(
+
+                          product.price || 0
+
+                        ).toLocaleString()}
+
+                      </span>
+
+                    </div>
+
+                    {/* Stock Bar */}
+
+                    <div className="mt-6">
+
+                      <div className="bg-slate-700 rounded-full h-2">
+
+                        <div
+
+                          className={`h-2 rounded-full
+
+                          ${
+
+                            stock > 300
+
+                              ? "bg-green-500"
+
+                              : stock > 100
+
+                              ? "bg-yellow-500"
+
+                              : "bg-red-500"
+
+                          }
+
+                          `}
+
+                          style={{
+
+                            width: `${percentage}%`,
+
+                          }}
+
+                        />
+
+                      </div>
+
+                    </div>
+
+                    {/* Buttons */}
+<div className="mt-6 border-t border-slate-700 pt-4">
+
+  <div className="flex justify-between text-sm">
+
+    <span className="text-slate-400">
+
+      Inventory Value
+
+    </span>
+
+    <span className="text-green-400 font-bold">
+
+      ₦{(
+        Number(product.stock || 0) *
+        Number(product.price || 0)
+      ).toLocaleString()}
+
+    </span>
+
+  </div>
+
+</div>
+
+                  </div>
+
+                </div>
+
+              );
+
+            })}
+
+          </div>
+
+        )}
+
+      </div>
+
+      {/* ==========================================
+            RECENT SALES STARTS HERE
+      ========================================== */}
+
+{/* ==========================================
+            RECENT CUSTOMER ORDERS
+========================================== */}
+
+<div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-8">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <div>
+
+      <h2 className="text-3xl font-bold text-white">
+        Recent Customer Orders
+      </h2>
+
+      <p className="text-slate-400 mt-2">
+        Latest 10 Orders From The Mobile App
+      </p>
+
+    </div>
+
+    <div className="bg-slate-800 px-5 py-3 rounded-xl">
+
+      <span className="text-white font-semibold">
+
+        {recentOrders.length} Orders
+
+      </span>
+
+    </div>
+
+  </div>
+
+  {recentOrders.length === 0 ? (
+
+    <div className="py-24 text-center">
+
+      <DollarSign
+        className="mx-auto text-slate-600"
+        size={60}
+      />
+
+      <h2 className="text-white text-2xl font-bold mt-5">
+
+        No Customer Orders
 
       </h2>
 
-      <p className="text-gray-500">
+      <p className="text-slate-400 mt-2">
 
-        Latest POS Transactions
+        Orders from customers will automatically appear here.
 
       </p>
 
     </div>
+
+  ) : (
 
     <div className="overflow-x-auto">
 
@@ -664,23 +1520,41 @@ return (
 
         <thead>
 
-          <tr className="bg-gray-100">
+          <tr className="border-b border-slate-700">
 
-            <th className="text-left p-4">
+            <th className="text-left py-4 text-slate-400">
 
-              Product
-
-            </th>
-
-            <th className="text-left p-4">
-
-              Quantity
+              Customer
 
             </th>
 
-            <th className="text-left p-4">
+            <th className="text-left py-4 text-slate-400">
 
-              Amount
+              Order No.
+
+            </th>
+
+            <th className="text-center py-4 text-slate-400">
+
+              Status
+
+            </th>
+
+            <th className="text-right py-4 text-slate-400">
+
+              Total
+
+            </th>
+
+            <th className="text-center py-4 text-slate-400">
+
+              Date
+
+            </th>
+
+            <th className="text-center py-4 text-slate-400">
+
+              Action
 
             </th>
 
@@ -690,48 +1564,178 @@ return (
 
         <tbody>
 
-          {sales.slice(0, 10).map(
-            (sale) => (
+          {recentOrders.map((order) => (
 
-              <tr
-                key={sale.id}
-                className="border-b"
-              >
+            <tr
+              key={order.id}
+              className="border-b border-slate-800 hover:bg-slate-800 transition"
+            >
 
-                <td className="p-4 font-bold">
+              <td className="py-5">
 
-                  {sale.product_name}
+                <div className="flex items-center gap-3">
 
-                </td>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-bold">
 
-                <td className="p-4">
+                    {(order.customer_name || "C").charAt(0)}
 
-                  {sale.quantity}
+                  </div>
 
-                </td>
+                  <div>
 
-                <td className="p-4 text-green-600 font-bold">
+                    <h3 className="font-semibold text-white">
 
-                  ₦
-                  {Number(
-                    sale.total_amount
-                  ).toLocaleString()}
+                      {order.customer_name || "Customer"}
 
-                </td>
+                    </h3>
 
-              </tr>
-            )
-          )}
+                  </div>
 
-        </tbody>
+                </div>
 
-      </table>
+              </td>
+
+              <td className="text-slate-300 font-medium">
+
+                {order.order_number || order.id}
+
+              </td>
+
+              <td className="text-center">
+
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    order.status === "Completed"
+                      ? "bg-green-500/20 text-green-400"
+                      : order.status === "Pending"
+                      ? "bg-yellow-500/20 text-yellow-300"
+                      : "bg-blue-500/20 text-blue-400"
+                  }`}
+                >
+
+                  {order.status || "Processing"}
+
+                </span>
+
+              </td>
+
+              <td className="text-right font-bold text-green-400">
+
+                ₦{Number(order.total_amount || 0).toLocaleString()}
+
+              </td>
+
+              <td className="text-center text-slate-400">
+
+                {new Date(order.created_at).toLocaleDateString("en-GB")}
+
+              </td>
+
+              <td className="text-center">
+
+<button
+  onClick={() => {
+    setSelectedOrder(order);
+    setShowOrderModal(true);
+  }}
+  className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition text-white font-semibold"
+>
+  View Details
+</button>
+
+              </td>
+
+            </tr>
+
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
+</div>
+
+{/* ==========================
+      ORDER DETAILS MODAL
+========================== */}
+
+{showOrderModal && selectedOrder && (
+  <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+
+    <div className="bg-slate-900 w-[650px] max-w-[95%] rounded-3xl border border-slate-700 p-8">
+
+      <div className="flex justify-between items-center mb-8">
+
+        <h2 className="text-3xl font-bold text-white">
+          Order Details
+        </h2>
+
+        <button
+          onClick={() => setShowOrderModal(false)}
+          className="text-slate-400 hover:text-white text-2xl"
+        >
+          ✕
+        </button>
+
+      </div>
+
+      <div className="space-y-5">
+
+        <div>
+          <p className="text-slate-400">Customer</p>
+          <h3 className="text-xl font-bold text-white">
+            {selectedOrder.customer_name}
+          </h3>
+        </div>
+
+        <div>
+          <p className="text-slate-400">Order Number</p>
+          <h3 className="text-white">
+            {selectedOrder.order_number}
+          </h3>
+        </div>
+
+        <div>
+          <p className="text-slate-400">Total Amount</p>
+          <h2 className="text-3xl font-black text-green-400">
+            ₦{Number(selectedOrder.total_amount).toLocaleString()}
+          </h2>
+        </div>
+
+        <div>
+          <p className="text-slate-400">Status</p>
+          <h3 className="text-blue-400">
+            {selectedOrder.status}
+          </h3>
+        </div>
+
+        <div>
+          <p className="text-slate-400">Payment Status</p>
+          <h3 className="text-green-400">
+            {selectedOrder.payment_status}
+          </h3>
+        </div>
+
+      </div>
+
+      <div className="mt-8 flex justify-end">
+
+        <button
+          onClick={() => setShowOrderModal(false)}
+          className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl text-white"
+        >
+          Close
+        </button>
+
+      </div>
 
     </div>
 
   </div>
+)}
 
 </div>
 
 );
+
 }

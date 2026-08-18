@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+import InventoryMaterials from "@/components/inventory/InventoryMaterials";
+
+import InventoryHistory from "@/components/inventory/InventoryHistory";
+
+import InventorySummary from "@/components/inventory/InventorySummary";
+
+import IssueMaterialForm from "@/components/inventory/IssueMaterialForm";
+
 import { supabase } from "@/lib/supabase";
 
 export default function InventoryPage() {
@@ -18,16 +26,18 @@ export default function InventoryPage() {
   const [name, setName] =
     useState("");
 
+    const [transactions, setTransactions] =
+  useState<any[]>([]);
+
   const [quantity, setQuantity] =
     useState("");
 
-  const [unit, setUnit] =
-    useState("");
-  const [supplier, setSupplier] =
-  useState("");
+  const [issueMaterialName, setIssueMaterialName] = useState("");
 
-const [invoiceNumber, setInvoiceNumber] =
-  useState("");  
+const [issueQuantity, setIssueQuantity] = useState("");  
+
+  const [unit, setUnit] =
+    useState("");  
 
   useEffect(() => {
 
@@ -39,131 +49,164 @@ const [invoiceNumber, setInvoiceNumber] =
      FETCH INVENTORY
   ========================== */
 
-  async function fetchInventory() {
+async function fetchInventory() {
 
-    const { data } =
-      await supabase
+  /* FETCH INVENTORY */
 
-        .from("inventory")
+  const { data } =
+    await supabase
+      .from("inventory")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      });
 
-        .select("*")
+  setInventory(data || []);
 
-        .order("created_at", {
-          ascending: false,
-        });
+  /* FETCH INVENTORY HISTORY */
 
-    setInventory(data || []);
-  }
+  const { data: history } =
+    await supabase
+      .from("inventory_transactions")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      });
 
-  /* =========================
-     ADD INVENTORY
-  ========================== */
+  setTransactions(history || []);
 
-async function addInventory() {
+}
 
-  if (
-    !name ||
-    !quantity
-  ) {
+ /* =========================
+   ISSUE MATERIAL
+========================== */
 
-    alert(
-      "Fill all fields"
-    );
+async function issueMaterial() {
 
+  if (!issueMaterialName || !issueQuantity) {
+    alert("Select a material and quantity.");
     return;
   }
 
-  const existingMaterial =
-    inventory.find(
-      (item) =>
-        item.name
-          .toLowerCase()
-          .trim() ===
-        name
-          .toLowerCase()
-          .trim()
-    );
+  const item = inventory.find(
+    (i) => i.name === issueMaterialName
+  );
 
-  if (
-    existingMaterial
-  ) {
+  if (!item) {
+    alert("Material not found.");
+    return;
+  }
+
+  const currentQuantity = Number(item.quantity);
+  const quantityToIssue = Number(issueQuantity);
+
+  if (quantityToIssue > currentQuantity) {
+    alert("Insufficient stock.");
+    return;
+  }
+
+  await supabase
+    .from("inventory")
+    .update({
+      quantity: currentQuantity - quantityToIssue,
+    })
+    .eq("id", item.id);
+
+const { error } = await supabase
+  .from("inventory_transactions")
+  .insert([
+    {
+      material_name: issueMaterialName,
+      quantity_used: quantityToIssue,
+      transaction_type: "ISSUED",
+      reference: "Manual Material Issue",
+    },
+  ]);
+
+if (error) {
+  console.error(error);
+  alert(error.message);
+  return;
+}
+
+  setIssueMaterialName("");
+  setIssueQuantity("");
+
+  fetchInventory();
+}
+
+/* =========================
+   ADD INVENTORY
+========================== */
+
+async function addInventory() {
+
+  if (!name || !quantity) {
+    alert("Fill all fields");
+    return;
+  }
+
+  const existingMaterial = inventory.find(
+    (item) =>
+      item.name.toLowerCase().trim() ===
+      name.toLowerCase().trim()
+  );
+
+  if (existingMaterial) {
 
     const newQuantity =
-      Number(
-        existingMaterial.quantity
-      ) +
+      Number(existingMaterial.quantity) +
       Number(quantity);
 
     await supabase
-
       .from("inventory")
-
       .update({
-        quantity:
-          newQuantity,
+        quantity: newQuantity,
       })
-
-      .eq(
-        "id",
-        existingMaterial.id
-      );
+      .eq("id", existingMaterial.id);
 
   } else {
 
     await supabase
-
       .from("inventory")
-
       .insert([
         {
           name,
-          quantity:
-            Number(quantity),
+          quantity: Number(quantity),
           unit,
         },
       ]);
+
   }
 
-const { data, error } =
-  await supabase
+const { data, error } = await supabase
+  .from("inventory_transactions")
+  .insert([
+    {
+      material_name: name,
+      quantity_used: Number(quantity),
+      transaction_type: "RECEIVED",
+      reference: "Manual Stock Entry",
+    },
+  ])
+  .select();
 
-    .from("inventory_transactions")
+console.log("Transaction Data:", data);
+console.log("Transaction Error:", error);
 
-    .insert([
-      {
-        material_name: name,
-
-        quantity_used: Number(quantity),
-
-        transaction_type: "RECEIVED",
-
-        reference:
-          invoiceNumber || "Stock Receipt",
-      },
-    ])
-
-    .select();
-
-console.log("DATA:", data);
-console.log("ERROR:", error);
+if (error) {
+  alert(error.message);
+  return;
+}
 
   setName("");
-
   setQuantity("");
-
   setUnit("");
-
-  setSupplier("");
-
-  setInvoiceNumber("");
 
   fetchInventory();
 
-  alert(
-    "Inventory received successfully"
-  );
+  alert("Inventory received successfully");
 }
-
   /* =========================
      LOW STOCK CHECKER
   ========================== */
@@ -219,7 +262,7 @@ console.log("ERROR:", error);
       (item) =>
         isLowStock(item)
     ).length;
-
+console.log(transactions);
   return (
 
     <ProtectedRoute
@@ -229,88 +272,59 @@ console.log("ERROR:", error);
   ]}
 >
 
-      <div className="p-10 bg-gray-100 min-h-screen">
+      <div className="min-h-screen p-10 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white">
 
         {/* HEADER */}
 
-        <div className="mb-10">
+<div className="mb-10 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">
 
-          <h1 className="text-5xl font-black text-blue-950">
+  <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-10">
 
-            Smart Inventory Control
+    <div className="flex items-center justify-between">
 
-          </h1>
+<div>
 
-          <p className="text-gray-600 mt-2 text-lg">
+  <div className="flex items-center gap-3 mb-4">
 
-            Bakery raw material monitoring system
+    <span className="inline-flex items-center rounded-full bg-amber-500/20 text-amber-300 px-4 py-1 text-sm font-bold">
+      📦 INVENTORY MANAGEMENT
+    </span>
 
-          </p>
+    <span className="inline-flex items-center rounded-full bg-slate-800 border border-slate-700 text-slate-300 px-4 py-1 text-sm">
+      📅 {new Date().toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })}
+    </span>
 
-        </div>
+  </div>
 
-        {/* SUMMARY */}
+  <h1 className="text-5xl font-black text-white">
+    Smart Inventory Control
+  </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+  <p className="text-slate-300 mt-3 text-lg">
+    Monitor inventory levels, stock movements, recipe materials and warehouse operations.
+  </p>
 
-          {/* TOTAL MATERIALS */}
+</div>
 
-          <div className="bg-white rounded-3xl shadow p-8">
+      <div className="hidden lg:flex items-center justify-center w-28 h-28 rounded-full bg-amber-500/10 border border-amber-400/30 text-6xl">
+        📦
+      </div>
 
-            <h2 className="text-xl font-bold text-gray-500">
+    </div>
 
-              Total Materials
+  </div>
 
-            </h2>
+</div>
 
-            <p className="text-5xl font-black text-blue-950 mt-4">
-
-              {totalMaterials}
-
-            </p>
-
-          </div>
-
-          {/* LOW STOCK */}
-
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-xl font-bold text-gray-500">
-
-              Low Stock Alerts
-
-            </h2>
-
-            <p className="text-5xl font-black text-red-600 mt-4">
-
-              {lowStockCount}
-
-            </p>
-
-          </div>
-
-          {/* HEALTH STATUS */}
-
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-xl font-bold text-gray-500">
-
-              Inventory Health
-
-            </h2>
-
-            <p className="text-3xl font-black text-green-700 mt-6">
-
-              {lowStockCount > 0
-                ? "Attention Needed"
-                : "Healthy"}
-
-            </p>
-
-          </div>
-
-        </div>
-
+<InventorySummary
+  totalMaterials={totalMaterials}
+  lowStockCount={lowStockCount}
+/>
         {/* LOW STOCK ALERTS */}
 
         {lowStockCount > 0 && (
@@ -335,7 +349,7 @@ console.log("ERROR:", error);
 
                   <div
                     key={item.id}
-                    className="bg-white p-4 rounded-2xl font-bold text-red-600"
+                    className="bg-slate-900 border border-slate-700 p-4 rounded-2xl font-bold text-red-600"
                   >
 
                     ⚠ {item.name} stock is low
@@ -352,7 +366,7 @@ console.log("ERROR:", error);
 
         {/* ADD INVENTORY */}
 
-        <div className="bg-white rounded-3xl shadow p-8 mb-10">
+        <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow p-8 mb-10">
 
           <h2 className="text-3xl font-bold mb-6">
 
@@ -362,20 +376,38 @@ console.log("ERROR:", error);
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
-            <input
-              type="text"
-              placeholder="Material Name"
+<select
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white focus:outline-none focus:border-amber-400"
+>
+  <option value="">Select Material</option>
 
-              value={name}
+  <optgroup label="🍞 Production Ingredients">
+    <option value="Flour">Flour</option>
+    <option value="Sugar">Sugar</option>
+    <option value="Butter">Butter</option>
+    <option value="Yeast">Yeast</option>
+    <option value="Groundnut Oil">Groundnut Oil</option>
+  </optgroup>
 
-              onChange={(e) =>
-                setName(
-                  e.target.value
-                )
-              }
+  <optgroup label="🥖 Bakery Recipes">
+    <option value="Iruka Recipe">Iruka Recipe</option>
+    <option value="White Recipe">White Recipe</option>
+    <option value="Fruits Recipe">Fruits Recipe</option>
+  </optgroup>
 
-              className="border-2 p-4 rounded-2xl"
-            />
+  <optgroup label="📦 Packaging Materials">
+    <option value="Tape">Tape</option>
+    <option value="Twist">Twist</option>
+  </optgroup>
+
+  <optgroup label="🧪 Bakery Additives">
+    <option value="Brown">Brown</option>
+    <option value="Resins">Resins</option>
+    <option value="Flavour">Flavour</option>
+  </optgroup>
+</select>
 
             <input
               type="number"
@@ -389,7 +421,7 @@ console.log("ERROR:", error);
                 )
               }
 
-              className="border-2 p-4 rounded-2xl"
+              className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
             />
 
             <input
@@ -404,37 +436,9 @@ console.log("ERROR:", error);
                 )
               }
 
-              className="border-2 p-4 rounded-2xl"
+              className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
             />
-            <input
-  type="text"
-  placeholder="Supplier"
 
-  value={supplier}
-
-  onChange={(e) =>
-    setSupplier(
-      e.target.value
-    )
-  }
-
-  className="border-2 p-4 rounded-2xl"
-/>
-
-<input
-  type="text"
-  placeholder="Invoice Number"
-
-  value={invoiceNumber}
-
-  onChange={(e) =>
-    setInvoiceNumber(
-      e.target.value
-    )
-  }
-
-  className="border-2 p-4 rounded-2xl"
-/>
 
           </div>
 
@@ -450,121 +454,78 @@ console.log("ERROR:", error);
 
         </div>
 
+        <IssueMaterialForm
+  material={issueMaterialName}
+  setMaterial={setIssueMaterialName}
+  quantity={issueQuantity}
+  setQuantity={setIssueQuantity}
+  issueMaterial={issueMaterial}
+/>
+
         {/* INVENTORY TABLE */}
 
-        <div className="bg-white rounded-3xl shadow p-8">
+<InventoryMaterials
+  inventory={inventory}
+  isLowStock={isLowStock}
+/>
 
-          <h2 className="text-3xl font-bold mb-6">
+<div className="mt-10">
 
-            Inventory Ledger
+  <h2 className="text-3xl font-black text-blue-950 mb-6">
 
-          </h2>
+    🥖 Recipe Inventory
 
-          <div className="overflow-x-auto">
+  </h2>
 
-            <table className="w-full">
+  <div className="grid md:grid-cols-3 gap-6">
 
-              <thead>
+    {inventory
+      .filter((item) =>
+        [
+          "Iruka Recipe",
+          "White Recipe",
+          "Fruits Recipe",
+        ].includes(item.name)
+      )
+      .map((item) => (
 
-                <tr className="border-b bg-gray-50">
+        <div
+          key={item.id}
+          className="rounded-3xl p-6 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-xl"
+        >
 
-                  <th className="p-4 text-left">
+          <h3 className="text-2xl font-black">
 
-                    Material
+            {item.name}
 
-                  </th>
+          </h3>
 
-                  <th className="p-4 text-left">
+          <p className="text-5xl font-black mt-4">
 
-                    Quantity
+            {item.quantity}
 
-                  </th>
+          </p>
 
-                  <th className="p-4 text-left">
+          <p className="opacity-90">
 
-                    Unit
+            Recipe Packs
 
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Status
-
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {inventory.map(
-                  (item) => {
-
-                    const lowStock =
-                      isLowStock(item);
-
-                    return (
-
-                      <tr
-                        key={item.id}
-                        className="border-b hover:bg-gray-50"
-                      >
-
-                        <td className="p-4 font-semibold">
-
-                          {item.name}
-
-                        </td>
-
-                        <td className="p-4 font-bold">
-
-                          {item.quantity}
-
-                        </td>
-
-                        <td className="p-4">
-
-                          {item.unit}
-
-                        </td>
-
-                        <td className="p-4">
-
-                          {lowStock ? (
-
-                            <span className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold">
-
-                              Low Stock
-
-                            </span>
-
-                          ) : (
-
-                            <span className="bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold">
-
-                              Healthy
-
-                            </span>
-
-                          )}
-
-                        </td>
-
-                      </tr>
-                    );
-                  }
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
+          </p>
 
         </div>
 
-      </div>
+      ))}
+
+  </div>
+
+</div>
+
+<InventoryHistory
+  transactions={transactions}
+/>
+
+        </div>
+
 
     </ProtectedRoute>
   );

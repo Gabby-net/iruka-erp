@@ -6,6 +6,14 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 
 import { supabase } from "@/lib/supabase";
 
+import ProductionStats from "@/components/production/ProductionStats";
+
+import ProductionForm from "@/components/production/ProductionForm";
+
+import RecipePreview from "@/components/production/RecipePreview";
+
+import ProductionHistory from "@/components/production/ProductionHistory";
+
 export default function ProductionPage() {
 
   /* =========================
@@ -18,6 +26,8 @@ export default function ProductionPage() {
   const [productionLogs, setProductionLogs] =
     useState<any[]>([]);
 
+  const [saving, setSaving] = useState(false);
+
   const [selectedProduct, setSelectedProduct] =
     useState("");
 
@@ -29,9 +39,27 @@ export default function ProductionPage() {
 
   const [wasteQuantity, setWasteQuantity] =
     useState("");
-    const [flourBagsUsed, setFlourBagsUsed] =
+ const [doughBatches, setDoughBatches] =
   useState("");
 
+  const [selectedProduction, setSelectedProduction] =
+  useState<any>(null);
+
+const [showProductionDetails, setShowProductionDetails] =
+  useState(false);
+
+  const [historySearch, setHistorySearch] =
+  useState("");
+
+const [historyLimit, setHistoryLimit] =
+  useState(10);
+
+  const selectedProductData = products.find(
+  (product) => product.name === selectedProduct
+);
+
+const selectedRecipeName =
+  selectedProductData?.recipe_name || "";
   /* =========================
      LOAD DATA
   ========================== */
@@ -88,6 +116,10 @@ console.log(productionData);
 
   async function saveProduction() {
 
+   if (saving) return;
+
+setSaving(true);
+
     if (
       !selectedProduct ||
       !quantityProduced
@@ -104,11 +136,56 @@ console.log(productionData);
        SAVE PRODUCTION LOG
     ========================== */
 
-const selectedProductData = products.find(
-  (p) => p.name === selectedProduct
-);
+/* =========================
+   RECIPE MAPPING
+========================== */
 
-await supabase
+let recipeName = "";
+
+if (
+  [
+    "Small Iruka",
+    "Medium Iruka",
+    "Classic Iruka",
+    "Jumbo Iruka",
+    "Big Smart",
+  ].includes(selectedProduct)
+) {
+
+  recipeName = "Iruka Recipe";
+
+}
+
+else if (
+  [
+    "Small Rosy",
+    "Medium Rosy",
+    "Big Brother Family",
+  ].includes(selectedProduct)
+) {
+
+  recipeName = "White Recipe";
+
+}
+
+else if (
+  [
+    "Classic Fruits",
+    "Jumbo Fruits",
+  ].includes(selectedProduct)
+) {
+
+  recipeName = "Fruits Recipe";
+
+}
+
+if (!recipeName) {
+  alert("Recipe mapping not found.");
+  setSaving(false);
+  return;
+}
+
+const { data, error } = await supabase
   .from("production_logs")
   .insert([
     {
@@ -116,20 +193,28 @@ await supabase
       bread: selectedProduct,
       quantity: Number(quantityProduced),
       waste_quantity: Number(wasteQuantity || 0),
-
-flour_bags_used:
-  Number(flourBagsUsed || 0),
+      dough_batches: Number(doughBatches || 0),
       produced_by: "Production Staff",
-      batch: "IRK-" + Date.now(),
+      batch: `IRK-${new Date()
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, "")}-${Math.floor(Math.random() * 900 + 100)}`,
       shift,
       team: "A",
       status: "Completed",
-      production_date:
-        new Date()
-          .toISOString()
-          .split("T")[0],
+      production_date: new Date().toISOString().split("T")[0],
     },
-  ]);
+  ])
+  .select();
+
+if (error) {
+  console.error("Production insert error:", error);
+  alert(error.message);
+  setSaving(false);
+  return;
+}
+
+console.log("Production inserted:", data);
 
 /* UPDATE FINISHED GOODS STOCK */
 
@@ -225,6 +310,12 @@ const groundnutOil =
       "Groundnut Oil"
   );
 
+  const recipeInventory =
+  inventory?.find(
+    (item) =>
+      item.name === recipeName
+  );
+
 const tape =
   inventory?.find(
     (item) =>
@@ -243,83 +334,93 @@ const twist =
        PRODUCT OUTPUT RATIOS
     ========================== */
 
-    const recipeOutputs: any = {
 
-      "Small Iruka": 700,
-
-      "Small Rosy": 600,
-
-      "Medium Iruka": 230,
-
-      "Medium Rosy": 230,
-
-      "Big Smart": 300,
-
-      "Classic Iruka": 160,
-
-      "Classic Fruits": 160,
-
-      "Jumbo Iruka": 125,
-
-      "Jumbo Fruits": 125,
-
-      "Big Brother Family": 96,
-    };
-
-    const standardOutput =
-      recipeOutputs[
-        selectedProduct
-      ];
-
-    if (!standardOutput) {
-
-      alert(
-        "Recipe output not found for this product"
-      );
-
-      return;
-    }
-
-    /* =========================
-       CALCULATE RATIO
-    ========================== */
-
-const productionRatio =
-  Number(quantityProduced) /
-  standardOutput;
     /* =========================
    MATERIAL USAGE
 ========================== */
 
-const bagRatio =
-  Number(flourBagsUsed || 0) / 200;
+const batches =
+Number(doughBatches);
 
-const flourUsed =
-  Number(flourBagsUsed || 0);
+/* =========================
+   INVENTORY VALIDATION
+========================== */
 
-const sugarUsed =
-  1200 * bagRatio;
+const flourNeeded = batches * 2;
 
-const butterUsed =
-  135 * bagRatio;
+const sugarNeeded = (batches * 12) / 50;
 
-const yeastUsed =
-  50 * bagRatio;
+const butterNeeded = (batches * 1.35) / 15;
 
-const resinsUsed =
-  40 * bagRatio;
+const yeastNeeded = batches;
 
-const brownUsed =
-  83 * bagRatio;
+const groundnutOilNeeded = (batches * 0.23) / 23;
 
-const groundnutOilUsed =
-  25 * bagRatio;
+const recipeNeeded = batches;
 
-const tapeUsed =
-  400 * bagRatio;
+const resinNeeded =
+  selectedProduct === "Small Rosy" ||
+  selectedProduct === "Big Brother Family"
+    ? batches / 10
+    : 0;
 
-const twistUsed =
-  8 * bagRatio;
+if (Number(flour?.quantity || 0) < flourNeeded) {
+  alert("Not enough Flour.");
+  return;
+}
+
+if (Number(sugar?.quantity || 0) < sugarNeeded) {
+  alert("Not enough Sugar.");
+  return;
+}
+
+if (Number(butter?.quantity || 0) < butterNeeded) {
+  alert("Not enough Butter.");
+  return;
+}
+
+if (Number(yeast?.quantity || 0) < yeastNeeded) {
+  alert("Not enough Yeast.");
+  return;
+}
+
+if (Number(groundnutOil?.quantity || 0) < groundnutOilNeeded) {
+  alert("Not enough Groundnut Oil.");
+  return;
+}
+
+if (
+  Number(recipeInventory?.quantity || 0) < recipeNeeded
+) {
+  alert(`Not enough ${recipeName}.`);
+  return;
+}
+
+if (
+  resinNeeded > 0 &&
+  Number(resins?.quantity || 0) < resinNeeded
+) {
+  alert("Not enough Resins.");
+  return;
+}
+
+/* =========================
+   MATERIAL DEDUCTIONS
+========================== */
+
+const flourUsed = flourNeeded;
+
+const sugarUsed = sugarNeeded;
+
+const butterUsed = butterNeeded;
+
+const yeastUsed = yeastNeeded;
+
+const groundnutOilUsed = groundnutOilNeeded;
+
+const recipeUsed = recipeNeeded;
+
+const resinUsed = resinNeeded;
 
     /* =========================
        UPDATE INVENTORY
@@ -401,91 +502,142 @@ const twistUsed =
         );
     }
 
-    if (resins) {
+    if (groundnutOil) {
 
   await supabase
     .from("inventory")
     .update({
       quantity:
-        Number(
-          resins.quantity
-        ) -
-        (4 * productionRatio),
+        Number(groundnutOil.quantity) -
+        groundnutOilUsed,
     })
-    .eq(
-      "id",
-      resins.id
-    );
+    .eq("id", groundnutOil.id);
+
 }
 
-if (brown) {
+/* =========================
+   DEDUCT RECIPE PACKS
+========================== */
+
+if (recipeInventory) {
 
   await supabase
     .from("inventory")
     .update({
       quantity:
-        Number(
-          brown.quantity
-        ) -
-        (0.83 * productionRatio),
+        Number(recipeInventory.quantity) -
+        recipeUsed,
     })
-    .eq(
-      "id",
-      brown.id
-    );
+    .eq("id", recipeInventory.id);
+
 }
 
-if (groundnutOil) {
+/* =========================
+   DEDUCT RESINS
+========================== */
+
+if (resins && resinUsed > 0) {
 
   await supabase
     .from("inventory")
     .update({
       quantity:
-        Number(
-          groundnutOil.quantity
-        ) -
-        (0.25 * productionRatio),
+        Number(resins.quantity) -
+        resinUsed,
     })
-    .eq(
-      "id",
-      groundnutOil.id
-    );
+    .eq("id", resins.id);
+
 }
 
-if (tape) {
+/* =========================
+   INVENTORY HISTORY
+========================== */
 
-  await supabase
-    .from("inventory")
-    .update({
-      quantity:
-        Number(
-          tape.quantity
-        ) -
-        (20 * productionRatio),
-    })
-    .eq(
-      "id",
-      tape.id
-    );
+const transactions = [
+  {
+    material_name: "Flour",
+    quantity_used: flourUsed,
+  },
+  {
+    material_name: "Sugar",
+    quantity_used: sugarUsed,
+  },
+  {
+    material_name: "Butter",
+    quantity_used: butterUsed,
+  },
+  {
+    material_name: "Yeast",
+    quantity_used: yeastUsed,
+  },
+  {
+    material_name: "Groundnut Oil",
+    quantity_used: groundnutOilUsed,
+  },
+  {
+    material_name: recipeName,
+    quantity_used: recipeUsed,
+  },
+];
+
+if (resinUsed > 0) {
+  transactions.push({
+    material_name: "Resins",
+    quantity_used: resinUsed,
+  });
 }
 
-if (twist) {
+await supabase
+  .from("inventory_transactions")
+  .insert(
+    transactions.map((item) => ({
+      material_name: item.material_name,
+      quantity_used: item.quantity_used,
+      transaction_type: "AUTO_DEDUCTION",
+      reference: `${selectedProduct} Production`,
+      created_at: new Date().toISOString(),
+    }))
+  );
 
-  await supabase
-    .from("inventory")
-    .update({
-      quantity:
-        Number(
-          twist.quantity
-        ) -
-        (0.4 * productionRatio),
-    })
-    .eq(
-      "id",
-      twist.id
-    );
-}
+/* =========================
+   REFRESH & RESET
+========================== */
 
+await fetchData();
+
+console.log("After upload:", productionLogs);
+
+setSelectedProduct("");
+setQuantityProduced("");
+setWasteQuantity("");
+setDoughBatches("");
+setShift("Morning");
+
+setSaving(false);
+
+alert("successfully!");
+
+await supabase
+  .from("inventory_transactions")
+  .insert(
+    transactions.map((item) => ({
+      material_name: item.material_name,
+      quantity_used: item.quantity_used,
+      transaction_type: "AUTO_DEDUCTION",
+      reference: `${selectedProduct} Production`,
+      created_at: new Date().toISOString(),
+    }))
+  );
+console.log("After upload:", productionLogs);
+
+setSelectedProduct("");
+setQuantityProduced("");
+setWasteQuantity("");
+setDoughBatches("");
+setShift("Morning");
+
+alert("Production uploaded successfully!");
+setSaving(false);
     /* =========================
        RESET
     ========================== */
@@ -509,29 +661,89 @@ if (twist) {
      TOTALS
   ========================== */
 
-  const totalProduced =
-    productionLogs.reduce(
-      (sum, item) =>
-        sum +
-        Number(
-          item.quantity || 0
-        ),
-      0
+/* ==========================================
+        TODAY'S PRODUCTION ONLY
+========================================== */
+
+const today = new Date().toISOString().split("T")[0];
+
+const todaysLogs = productionLogs.filter(
+(item)=>
+item.production_date===today
+);
+
+const totalProduced =
+todaysLogs.reduce(
+(sum,item)=>
+sum + Number(item.quantity || 0),
+0
+);
+
+const totalWaste =
+todaysLogs.reduce(
+(sum,item)=>
+sum + Number(item.waste_quantity || 0),
+0
+);
+
+const totalDoughBatches =
+todaysLogs.reduce(
+(sum,item)=>
+sum + Number(item.dough_batches || 0),
+0
+);
+
+const netProduction =
+totalProduced - totalWaste;
+
+/* ==========================================
+      PRODUCTION HISTORY
+========================================== */
+
+const filteredHistory = productionLogs
+  .filter((item) => {
+
+    const search =
+      historySearch.toLowerCase();
+
+    return (
+
+      (item.bread || "")
+        .toLowerCase()
+        .includes(search)
+
+      ||
+
+      (item.batch || "")
+        .toLowerCase()
+        .includes(search)
+
+      ||
+
+      (item.shift || "")
+        .toLowerCase()
+        .includes(search)
+
+      ||
+
+      (item.status || "")
+        .toLowerCase()
+        .includes(search)
+
     );
 
-  const totalWaste =
-    productionLogs.reduce(
-      (sum, item) =>
-        sum +
-        Number(
-          item.waste_quantity || 0
-        ),
-      0
-    );
+  })
+  .sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() -
+      new Date(a.created_at).getTime()
+  );
 
-  const netProduction =
-    totalProduced -
-    totalWaste;
+const displayedHistory =
+  filteredHistory.slice(
+    0,
+    historyLimit
+  );
 
   return (
 
@@ -542,358 +754,455 @@ if (twist) {
       ]}
     >
 
-      <div className="p-10 bg-gray-100 min-h-screen">
+      <div className="min-h-screen bg-[#08111f] -m-6 p-8">
 
-        {/* HEADER */}
+{/* ==========================================
+            HEADER
+========================================== */}
 
-        <div className="mb-10">
+<div className="flex flex-col xl:flex-row justify-between xl:items-center gap-8 mb-10">
 
-          <h1 className="text-5xl font-black text-blue-950">
+  <div>
 
-            Daily Production Center
+    <h1 className="text-5xl font-black text-white">
 
-          </h1>
+      Production Center
 
-          <p className="text-gray-600 mt-2 text-lg">
+    </h1>
 
-            Smart bakery production & inventory automation
+    <p className="text-slate-400 mt-3 text-lg">
 
-          </p>
+      Live bakery production, dough tracking and inventory automation
 
-        </div>
+    </p>
 
-        {/* SUMMARY */}
+  </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+  <div className="bg-slate-900 border border-slate-700 rounded-3xl px-8 py-6">
 
-          {/* PRODUCED */}
+    <p className="text-slate-400">
 
-          <div className="bg-white rounded-3xl shadow p-8">
+      Today
 
-            <h2 className="text-xl font-bold text-gray-500">
+    </p>
 
-              Total Produced
+    <h2 className="text-2xl font-bold text-white mt-2">
 
-            </h2>
+      {new Date().toLocaleDateString("en-GB",{
+        weekday:"long",
+        day:"numeric",
+        month:"long",
+        year:"numeric",
+      })}
 
-            <p className="text-5xl font-black text-blue-950 mt-4">
+    </h2>
 
-              {totalProduced}
+    <p className="text-yellow-400 mt-3 font-semibold">
 
-            </p>
+      Production Operations
 
-          </div>
+    </p>
 
-          {/* WASTE */}
+  </div>
 
-          <div className="bg-white rounded-3xl shadow p-8">
+</div>
 
-            <h2 className="text-xl font-bold text-gray-500">
+{/* ==========================================
+            KPI CARDS
+========================================== */}
 
-              Total Waste
+<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
 
-            </h2>
+  {/* Today's Production */}
 
-            <p className="text-5xl font-black text-red-600 mt-4">
+  <div className="rounded-3xl border border-blue-800 bg-gradient-to-br from-slate-900 to-blue-950 p-7 shadow-xl">
 
-              {totalWaste}
+    <p className="text-blue-300 text-sm uppercase tracking-wider">
 
-            </p>
+      Today's Production
 
-          </div>
+    </p>
 
-          {/* NET */}
+    <h2 className="text-5xl font-black text-white mt-4">
 
-          <div className="bg-white rounded-3xl shadow p-8">
+      {totalProduced.toLocaleString()}
 
-            <h2 className="text-xl font-bold text-gray-500">
+    </h2>
 
-              Net Production
+    <p className="text-blue-200 mt-3">
 
-            </h2>
+      Pieces Produced
 
-            <p className="text-5xl font-black text-green-700 mt-4">
+    </p>
 
-              {netProduction}
+  </div>
 
-            </p>
+  {/* Waste */}
 
-          </div>
+  <div className="rounded-3xl border border-red-800 bg-gradient-to-br from-slate-900 to-red-950 p-7 shadow-xl">
 
-        </div>
+    <p className="text-red-300 text-sm uppercase tracking-wider">
 
-        {/* RECORD PRODUCTION */}
+      Waste
 
-        <div className="bg-white rounded-3xl shadow p-8 mb-10">
+    </p>
 
-          <h2 className="text-3xl font-bold mb-6">
+    <h2 className="text-5xl font-black text-red-400 mt-4">
 
-            Upload Daily Production
+      {totalWaste.toLocaleString()}
 
-          </h2>
+    </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <p className="text-red-200 mt-3">
 
-            {/* PRODUCT */}
+      Damaged Pieces
 
-            <select
-              value={selectedProduct}
+    </p>
 
-              onChange={(e) =>
-                setSelectedProduct(
-                  e.target.value
-                )
-              }
+  </div>
 
-              className="border-2 p-4 rounded-2xl"
+  {/* Net Production */}
+
+  <div className="rounded-3xl border border-green-800 bg-gradient-to-br from-slate-900 to-green-950 p-7 shadow-xl">
+
+    <p className="text-green-300 text-sm uppercase tracking-wider">
+
+      Net Production
+
+    </p>
+
+    <h2 className="text-5xl font-black text-green-400 mt-4">
+
+      {netProduction.toLocaleString()}
+
+    </h2>
+
+    <p className="text-green-200 mt-3">
+
+      Added To Stock
+
+    </p>
+
+  </div>
+
+  {/* Dough Batches */}
+
+  <div className="rounded-3xl border border-yellow-800 bg-gradient-to-br from-slate-900 to-yellow-950 p-7 shadow-xl">
+
+    <p className="text-yellow-300 text-sm uppercase tracking-wider">
+
+      Dough Batches
+
+    </p>
+
+    <h2 className="text-5xl font-black text-yellow-400 mt-4">
+
+      {totalDoughBatches.toLocaleString()}
+
+    </h2>
+
+    <p className="text-yellow-200 mt-3">
+
+      Mixed Today
+
+    </p>
+
+  </div>
+
+</div>
+
+{/* ==========================================
+        PRODUCTION WORKSPACE
+========================================== */}
+
+<div className="grid grid-cols-1 xl:grid-cols-5 gap-8 mb-10">
+
+  {/* RECORD PRODUCTION */}
+
+  <div className="xl:col-span-3 bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden">
+
+    <div className="px-8 py-6 border-b border-slate-700">
+
+      <h2 className="text-3xl font-bold text-white">
+
+        Record Production
+
+      </h2>
+
+      <p className="text-slate-400 mt-2">
+
+        Upload today's bakery production and automatically update inventory.
+
+      </p>
+
+    </div>
+
+    <div className="p-8">
+
+      <ProductionForm
+        products={products}
+        selectedProduct={selectedProduct}
+        setSelectedProduct={setSelectedProduct}
+        quantityProduced={quantityProduced}
+        setQuantityProduced={setQuantityProduced}
+        wasteQuantity={wasteQuantity}
+        setWasteQuantity={setWasteQuantity}
+        doughBatches={doughBatches}
+        setDoughBatches={setDoughBatches}
+        shift={shift}
+        setShift={setShift}
+        saveProduction={saveProduction}
+        saving={saving}
+      />
+
+    </div>
+
+  </div>
+
+  {/* LIVE RECIPE */}
+
+  <div className="xl:col-span-2 bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden">
+
+    <div className="px-8 py-6 border-b border-slate-700">
+
+      <h2 className="text-3xl font-bold text-white">
+
+        Live Recipe Preview
+
+      </h2>
+
+      <p className="text-slate-400 mt-2">
+
+        Ingredient deduction before production is uploaded.
+
+      </p>
+
+    </div>
+
+    <div className="p-8">
+
+      <RecipePreview
+        selectedProduct={selectedProduct}
+        doughBatches={doughBatches}
+        recipeName={selectedRecipeName}
+      />
+
+    </div>
+
+  </div>
+
+</div>
+
+{/* ==========================================
+        PRODUCTION HISTORY
+========================================== */}
+
+<div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden mt-10">
+
+  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-8 py-6 border-b border-slate-700">
+
+    <div>
+
+      <h2 className="text-3xl font-bold text-white">
+
+        Production History
+
+      </h2>
+
+      <p className="text-slate-400 mt-2">
+
+        Latest production uploaded to the database
+
+      </p>
+
+    </div>
+
+    <input
+      type="text"
+      placeholder="Search product, batch, shift..."
+      value={historySearch}
+      onChange={(e)=>setHistorySearch(e.target.value)}
+      className="bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white w-full lg:w-80 outline-none focus:border-yellow-500"
+    />
+
+  </div>
+
+  <div className="overflow-x-auto">
+
+    <table className="min-w-full">
+
+      <thead className="bg-slate-800">
+
+        <tr>
+
+          <th className="px-6 py-4 text-left text-slate-300">Product</th>
+
+          <th className="px-6 py-4 text-center text-slate-300">Shift</th>
+
+          <th className="px-6 py-4 text-center text-slate-300">Dough</th>
+
+          <th className="px-6 py-4 text-center text-slate-300">Produced</th>
+
+          <th className="px-6 py-4 text-center text-slate-300">Waste</th>
+
+          <th className="px-6 py-4 text-center text-slate-300">Net</th>
+
+          <th className="px-6 py-4 text-center text-slate-300">Status</th>
+
+          <th className="px-6 py-4 text-center text-slate-300">Date</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        {displayedHistory.length === 0 && (
+
+          <tr>
+
+            <td
+              colSpan={8}
+              className="text-center py-16 text-slate-400"
             >
 
-              <option value="">
+              No production history found.
 
-                Select Product
+            </td>
 
-              </option>
+          </tr>
 
-              {products.map(
-                (product) => (
+        )}
 
-                  <option
-                    key={product.id}
-                    value={
-                      product.name
-                    }
-                  >
+        {displayedHistory.map((log,index)=>{
 
-                    {product.name}
+          const net =
+            Number(log.quantity||0) -
+            Number(log.waste_quantity||0);
 
-                  </option>
-                )
-              )}
+          return(
 
-            </select>
-
-            {/* SHIFT */}
-
-            <select
-              value={shift}
-
-              onChange={(e) =>
-                setShift(
-                  e.target.value
-                )
-              }
-
-              className="border-2 p-4 rounded-2xl"
+            <tr
+              key={index}
+              className="border-b border-slate-800 hover:bg-slate-800/40 transition"
             >
 
-              <option value="Morning">
+              <td className="px-6 py-5">
 
-                Morning Shift
+                <div>
 
-              </option>
+                  <p className="font-bold text-white">
 
-              <option value="Night">
+                    {log.bread}
 
-                Night Shift
+                  </p>
 
-              </option>
+                  <p className="text-xs text-slate-400">
 
-            </select>
+                    {log.batch}
 
-            {/* QUANTITY */}
+                  </p>
 
-            <input
-              type="number"
+                </div>
 
-              placeholder="Quantity Produced"
+              </td>
 
-              value={quantityProduced}
+              <td className="px-6 py-5 text-center">
 
-              onChange={(e) =>
-                setQuantityProduced(
-                  e.target.value
-                )
-              }
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  log.shift==="Morning"
+                  ? "bg-orange-500/20 text-orange-300"
+                  : "bg-indigo-500/20 text-indigo-300"
+                }`}>
 
-              className="border-2 p-4 rounded-2xl"
-            />
+                  {log.shift}
 
-            {/* WASTE */}
+                </span>
 
-            <input
-              type="number"
+              </td>
 
-              placeholder="Waste Quantity"
+              <td className="px-6 py-5 text-center text-yellow-400 font-bold">
 
-              value={wasteQuantity}
+                {log.dough_batches}
 
-              onChange={(e) =>
-                setWasteQuantity(
-                  e.target.value
-                )
-              }
+              </td>
 
-              className="border-2 p-4 rounded-2xl"
-            />
-            {/* FLOUR BAGS USED */}
+              <td className="px-6 py-5 text-center text-blue-300 font-bold">
 
-<input
-  type="number"
-  placeholder="Flour Bags Used"
+                {Number(log.quantity).toLocaleString()}
 
-  value={flourBagsUsed}
+              </td>
 
-  onChange={(e) =>
-    setFlourBagsUsed(
-      e.target.value
-    )
-  }
+              <td className="px-6 py-5 text-center text-red-400 font-bold">
 
-  className="border-2 p-4 rounded-2xl"
-/>
+                {Number(log.waste_quantity).toLocaleString()}
 
-          </div>
+              </td>
 
-          <button
-            onClick={saveProduction}
+              <td className="px-6 py-5 text-center text-green-400 font-bold">
 
-            className="mt-6 bg-blue-950 hover:bg-blue-900 text-white px-8 py-4 rounded-2xl font-bold"
-          >
+                {net.toLocaleString()}
 
-            Upload Production
+              </td>
 
-          </button>
+              <td className="px-6 py-5 text-center">
+
+                <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-bold">
+
+                  {log.status}
+
+                </span>
+
+              </td>
+
+              <td className="px-6 py-5 text-center text-slate-300">
+
+                {new Date(
+                  log.created_at
+                ).toLocaleString()}
+
+              </td>
+
+            </tr>
+
+          );
+
+        })}
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+  {filteredHistory.length > historyLimit && (
+
+    <div className="p-6 border-t border-slate-700 flex justify-center">
+
+      <button
+
+        onClick={()=>
+          setHistoryLimit(
+            historyLimit+10
+          )
+        }
+
+        className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-8 py-3 rounded-xl transition"
+
+      >
+
+        Load More
+
+      </button>
+
+    </div>
+
+  )}
+
+</div>
+
 
         </div>
-
-        {/* HISTORY */}
-
-        <div className="bg-white rounded-3xl shadow p-8">
-
-          <h2 className="text-3xl font-bold mb-6">
-
-            Production History
-
-          </h2>
-
-          <div className="overflow-x-auto">
-
-            <table className="w-full">
-
-              <thead>
-
-                <tr className="border-b bg-gray-50">
-
-                  <th className="p-4 text-left">
-
-                    Product
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Shift
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Produced
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Waste
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Net
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Date
-
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {productionLogs.map(
-                  (log) => {
-
-                    const net =
-  Number(
-    log.quantity || 0
-  ) -
-  Number(
-    log.waste_quantity || 0
-  );
-
-                    return (
-
-                      <tr
-                        key={log.id}
-                        className="border-b hover:bg-gray-50"
-                      >
-
-                        <td className="p-4 font-semibold">
-  {log.bread}
-</td>
-
-                        <td className="p-4">
-
-                          {log.shift}
-
-                        </td>
-
-<td className="p-4 text-blue-950 font-bold">
-  {log.quantity}
-</td>
-
-                        <td className="p-4 text-red-600 font-bold">
-
-                          {
-                            log.waste_quantity
-                          }
-
-                        </td>
-
-                        <td className="p-4 text-green-700 font-black">
-
-                          {net}
-
-                        </td>
-
-                        <td className="p-4">
-
-                          {new Date(
-                            log.created_at
-                          ).toLocaleString()}
-
-                        </td>
-
-                      </tr>
-                    );
-                  }
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        </div>
-
-      </div>
 
     </ProtectedRoute>
   );

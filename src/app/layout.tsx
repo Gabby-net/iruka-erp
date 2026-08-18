@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import { Toaster } from "sonner";
+
 import { InventoryProvider } from "./context/InventoryContext";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -45,12 +47,38 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className="bg-[#081028]">
+
         <InventoryProvider>
+
           <AuthProvider>
+
             {children}
+
+            <Toaster
+              position="top-right"
+              richColors
+              expand
+              closeButton
+              duration={3500}
+              theme="dark"
+              toastOptions={{
+                style: {
+                  background: "#0B1739",
+                  color: "#FFFFFF",
+                  border: "1px solid #1E3A8A",
+                  borderRadius: "18px",
+                  padding: "16px",
+                  boxShadow:
+                    "0 20px 60px rgba(0,0,0,.45)",
+                },
+              }}
+            />
+
           </AuthProvider>
+
         </InventoryProvider>
+
       </body>
     </html>
   );

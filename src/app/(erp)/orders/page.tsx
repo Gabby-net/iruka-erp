@@ -47,16 +47,22 @@ export default function OrdersPage() {
     setProducts(data || []);
   }
 
-  async function fetchOrders() {
-    const { data } = await supabase
-      .from("orders")
-      .select("*")
-      .order("created_at", {
-        ascending: false,
-      });
+async function fetchOrders() {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .order("created_at", {
+      ascending: false,
+    })
+    .range(0, 9); // Latest 10 orders
 
-    setOrders(data || []);
+  if (error) {
+    console.error(error);
+    return;
   }
+
+  setOrders(data || []);
+}
 
   function addOrderRow() {
     setOrderItems([
@@ -139,196 +145,492 @@ export default function OrdersPage() {
   const totalAmount =
     calculateOrderTotal();
 
-  async function saveOrder() {
-    if (!customerName) {
-      alert("Enter customer name");
-      return;
-    }
-
-    const orderNumber =
-      `ORD-${Date.now()}`;
-
-    const {
-      data: orderData,
-      error,
-    } = await supabase
-      .from("orders")
-      .insert([
-        {
-          customer_name:
-            customerName,
-          phone,
-          order_number:
-            orderNumber,
-          payment_status:
-            "Pending",
-          order_status:
-            "Pending",
-          delivery_date:
-            deliveryDate,
-          notes,
-          total_amount:
-            totalAmount,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    const itemsToInsert =
-      orderItems.map((item) => ({
-        order_id: orderData.id,
-        bread_type:
-          item.bread_type,
-        quantity:
-          Number(item.quantity),
-        unit_price:
-          getBreadPrice(
-            item.bread_type
-          ),
-        total_amount:
-          getBreadPrice(
-            item.bread_type
-          ) *
-          Number(
-            item.quantity
-          ),
-      }));
-
-    await supabase
-      .from("order_items")
-      .insert(itemsToInsert);
-
-    alert(
-      "Customer order created successfully"
-    );
-
-    setCustomerName("");
-    setPhone("");
-    setDeliveryDate("");
-    setNotes("");
-
-    setOrderItems([
-      {
-        bread_type: "",
-        quantity: "",
-      },
-    ]);
-
-    fetchOrders();
+async function saveOrder() {
+  if (!customerName) {
+    alert("Enter customer name");
+    return;
   }
+
+  const orderNumber = `ORD-${Date.now()}`;
+
+  const {
+    data: orderData,
+    error,
+  } = await supabase
+    .from("orders")
+    .insert([
+      {
+        customer_name: customerName,
+        phone,
+        order_number: orderNumber,
+        payment_status: "Pending",
+        order_status: "Pending",
+        delivery_date: deliveryDate,
+        notes,
+        total_amount: totalAmount,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  const itemsToInsert = orderItems.map((item) => ({
+    order_id: orderData.id,
+    bread_type: item.bread_type,
+    quantity: Number(item.quantity),
+    unit_price: getBreadPrice(item.bread_type),
+    total_amount:
+      getBreadPrice(item.bread_type) *
+      Number(item.quantity),
+  }));
+
+  const { error: itemsError } = await supabase
+    .from("order_items")
+    .insert(itemsToInsert);
+
+  if (itemsError) {
+    alert(itemsError.message);
+    return;
+  }
+
+  alert("Customer order created successfully");
+
+  setCustomerName("");
+  setPhone("");
+  setDeliveryDate("");
+  setNotes("");
+
+  setOrderItems([
+    {
+      bread_type: "",
+      quantity: "",
+    },
+  ]);
+
+  fetchOrders();
+}
+
+async function completeCustomerOrder(order: any) {
+
+  if (order.order_status === "Completed") {
+    alert("This order has already been completed.");
+    return;
+  }
+
+  const { data: items, error } = await supabase
+    .from("order_items")
+    .select("*")
+    .eq("order_id", order.id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  for (const item of items || []) {
+
+    const { data: product, error: productError } =
+      await supabase
+        .from("products")
+        .select("*")
+        .eq("name", item.bread_type)
+        .single();
+
+    if (productError || !product) {
+      continue;
+    }
+
+    if (
+      Number(product.stock) <
+      Number(item.quantity)
+    ) {
+      alert(
+        `${item.bread_type} does not have enough stock.`
+      );
+      return;
+    }
+
+    const newStock =
+      Number(product.stock) -
+      Number(item.quantity);
+
+    const { error: updateError } =
+      await supabase
+        .from("products")
+        .update({
+          stock: newStock,
+        })
+        .eq("id", product.id);
+
+    if (updateError) {
+      alert(updateError.message);
+      return;
+    }
+
+    // Create Sales Record
+
+const unitPrice = Number(product.price || 0);
+
+const quantity = Number(item.quantity);
+
+const total = unitPrice * quantity;
+
+await supabase
+  .from("sales")
+  .insert({
+    customer_name:
+      order.customer_name || "Walk-in Customer",
+
+    total_amount: total,
+
+    payment: 0,
+
+    balance: total,
+
+    invoice_number:
+      order.order_number || `ORD-${order.id}`,
+
+    product_id: product.id,
+
+    product_name: product.name,
+
+    quantity: quantity,
+
+    unit_price: unitPrice,
+
+    cashier:
+      localStorage.getItem("full_name") ||
+      "System",
+
+    payment_method: "Pending",
+
+    payment_status: "Unpaid",
+
+    amount_paid: 0,
+  });
+
+  // Create Finance Transaction
+
+await supabase
+  .from("finance_transactions")
+  .insert({
+    transaction_type: "Sale",
+
+    description:
+      `${product.name} sold to ${
+        order.customer_name || "Walk-in Customer"
+      }`,
+
+    amount: total,
+
+    category: "Sales Revenue",
+
+    reference:
+      order.order_number || `ORD-${order.id}`,
+
+    payment_method: "Pending",
+
+    status: "Pending",
+
+    created_by:
+      localStorage.getItem("full_name") ||
+      "System",
+  });
+
+  }
+
+  const { error: orderError } = await supabase
+    .from("orders")
+    .update({
+      order_status: "Completed",
+    })
+    .eq("id", order.id);
+
+  if (orderError) {
+    alert(orderError.message);
+    return;
+  }
+
+  fetchOrders();
+
+  alert("Order completed successfully.");
+}
     return (
-    <ProtectedRoute
-      allowedRoles={[
-        "admin",
-        "cashier",
-      ]}
-    >
-      <div className="p-10 bg-gray-100 min-h-screen">
+<ProtectedRoute
+  allowedRoles={[
+    "admin",
+    "cashier",
+  ]}
+>
+  <div className="min-h-screen bg-slate-950 p-10">
+        
 
         {/* HEADER */}
 
-<div className="flex items-center gap-4 mb-6">
+<div className="mb-10 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">
 
-  <Image
-    src="/logo/nkiruka-logo.png"
-    alt="NKIRUKA Logo"
-    width={60}
-    height={60}
-  />
+  <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 p-10">
 
-  <div>
+    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
 
-    <h1 className="text-4xl font-bold">
+      <div className="flex items-center gap-6">
 
-      Customer Orders
+        <div className="w-24 h-24 rounded-3xl bg-slate-900/10 backdrop-blur flex items-center justify-center border border-white/20">
 
-    </h1>
+          <Image
+            src="/logo/nkiruka-logo.png"
+            alt="NKIRUKA Logo"
+            width={65}
+            height={65}
+          />
 
-    <p className="text-gray-500">
+        </div>
 
-      NKIRUKA / IRUKA INDUSTRIES LTD
+        <div>
 
-    </p>
+          <span className="inline-flex items-center rounded-full bg-amber-500/20 text-amber-300 px-4 py-1 text-sm font-bold mb-4">
+            🛒 CUSTOMER ORDERS
+          </span>
+
+          <h1 className="text-5xl font-black text-white">
+            Customer Orders
+          </h1>
+
+          <p className="text-slate-300 mt-3 text-lg">
+            Manage customer bookings, monitor order progress and track payments.
+          </p>
+
+        </div>
+
+      </div>
+
+      <div className="mt-8 lg:mt-0 text-right">
+
+        <div className="bg-slate-800/60 border border-slate-700 rounded-2xl px-6 py-5">
+
+          <p className="text-slate-400 text-sm">
+            Today
+          </p>
+
+          <p className="text-white font-bold text-xl">
+            {new Date().toLocaleDateString("en-GB", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+
+          <p className="text-amber-300 mt-2 text-lg font-bold">
+            {new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+
+        </div>
+
+      </div>
+
+    </div>
 
   </div>
 
 </div>
 
-        {/* SUMMARY CARDS */}
+<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+  <div className="rounded-3xl overflow-hidden bg-slate-900 border border-slate-700 shadow-xl">
 
-          <div className="bg-white rounded-3xl shadow p-8">
-            <h2 className="text-lg font-bold text-gray-500">
-              Total Orders
-            </h2>
+    <div className="h-2 bg-gradient-to-r from-blue-500 to-cyan-500"/>
 
-            <p className="text-5xl font-black text-blue-950 mt-4">
-              {orders.length}
-            </p>
-          </div>
+    <div className="p-6">
 
-          <div className="bg-white rounded-3xl shadow p-8">
-            <h2 className="text-lg font-bold text-gray-500">
-              Pending
-            </h2>
+      <div className="flex justify-between">
 
-            <p className="text-5xl font-black text-orange-600 mt-4">
-              {
-orders.filter(
-    (o) =>
-        o.order_status === "Completed"
-).length
-              }
-            </p>
-          </div>
+        <div>
 
-          <div className="bg-white rounded-3xl shadow p-8">
-            <h2 className="text-lg font-bold text-gray-500">
-              Ready
-            </h2>
+          <p className="text-slate-400">
+            Total Orders
+          </p>
 
-            <p className="text-5xl font-black text-green-700 mt-4">
-              {
-                orders.filter(
-                  (o) =>
-                    o.order_status ===
-                    "Ready"
-                ).length
-              }
-            </p>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow p-8">
-            <h2 className="text-lg font-bold text-gray-500">
-              Delivered
-            </h2>
-
-            <p className="text-5xl font-black text-purple-700 mt-4">
-              {
-                orders.filter(
-                  (o) =>
-                    o.order_status ===
-                    "Delivered"
-                ).length
-              }
-            </p>
-          </div>
+          <h2 className="text-5xl font-black text-white mt-3">
+            {orders.length}
+          </h2>
 
         </div>
 
+        <div className="text-5xl">
+          📋
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div className="rounded-3xl overflow-hidden bg-slate-900 border border-slate-700 shadow-xl">
+
+    <div className="h-2 bg-gradient-to-r from-orange-500 to-yellow-400"/>
+
+    <div className="p-6">
+
+      <div className="flex justify-between">
+
+        <div>
+
+          <p className="text-slate-400">
+            Pending
+          </p>
+
+          <h2 className="text-5xl font-black text-orange-400 mt-3">
+            {
+              orders.filter(
+                o => o.order_status === "Pending"
+              ).length
+            }
+          </h2>
+
+        </div>
+
+        <div className="text-5xl">
+          ⏳
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div className="rounded-3xl overflow-hidden bg-slate-900 border border-slate-700 shadow-xl">
+
+    <div className="h-2 bg-gradient-to-r from-emerald-500 to-green-400"/>
+
+    <div className="p-6">
+
+      <div className="flex justify-between">
+
+        <div>
+
+          <p className="text-slate-400">
+            Ready
+          </p>
+
+          <h2 className="text-5xl font-black text-emerald-400 mt-3">
+            {
+              orders.filter(
+                o => o.order_status === "Ready"
+              ).length
+            }
+          </h2>
+
+        </div>
+
+        <div className="text-5xl">
+          📦
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div className="rounded-3xl overflow-hidden bg-slate-900 border border-slate-700 shadow-xl">
+
+    <div className="h-2 bg-gradient-to-r from-purple-500 to-pink-500"/>
+
+    <div className="p-6">
+
+      <div className="flex justify-between">
+
+        <div>
+
+          <p className="text-slate-400">
+            Completed
+          </p>
+
+          <h2 className="text-5xl font-black text-purple-400 mt-3">
+            {
+              orders.filter(
+                o => o.order_status === "Completed"
+              ).length
+            }
+          </h2>
+
+        </div>
+
+        <div className="text-5xl">
+          ✅
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
         {/* ORDER FORM */}
 
-        <div className="bg-white rounded-3xl shadow p-8 mb-10">
+        <div className="mb-10 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">
 
-          <h2 className="text-3xl font-bold mb-6">
-            Create Customer Order
-          </h2>
+  <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 px-8 py-6 border-b border-slate-700">
+
+    <div className="flex items-center justify-between">
+
+      <div>
+
+        <span className="inline-flex items-center rounded-full bg-blue-500/20 text-blue-300 px-4 py-1 text-sm font-bold mb-3">
+          📝 ORDER ENTRY
+        </span>
+
+        <h2 className="text-3xl font-black text-white">
+          Create Customer Order
+        </h2>
+
+        <p className="text-slate-300 mt-2">
+          Record customer orders and schedule bakery production.
+        </p>
+
+      </div>
+
+      <div className="hidden lg:flex w-20 h-20 rounded-2xl bg-slate-900/10 items-center justify-center text-4xl">
+        🛒
+      </div>
+
+    </div>
+
+  </div>
+
+  <div className="bg-slate-900 p-8"></div>
+
+<div className="flex items-center justify-between mb-8 pb-5 border-b border-slate-700">
+
+  <div>
+
+    <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-full text-sm font-bold mb-3">
+      👤 CUSTOMER DETAILS
+    </div>
+
+    <h2 className="text-2xl font-black text-white">
+      Customer Information
+    </h2>
+
+    <p className="text-slate-400 mt-2">
+      Enter the customer's personal information before adding bread items.
+    </p>
+
+  </div>
+
+</div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
 
@@ -341,7 +643,7 @@ orders.filter(
                   e.target.value
                 )
               }
-              className="border-2 p-4 rounded-2xl"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800 text-white px-5 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
 
             <input
@@ -353,7 +655,7 @@ orders.filter(
                   e.target.value
                 )
               }
-              className="border-2 p-4 rounded-2xl"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800 text-white px-5 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
 
             <input
@@ -364,7 +666,7 @@ orders.filter(
                   e.target.value
                 )
               }
-              className="border-2 p-4 rounded-2xl"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800 text-white px-5 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
 
             <input
@@ -376,7 +678,7 @@ orders.filter(
                   e.target.value
                 )
               }
-              className="border-2 p-4 rounded-2xl"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800 text-white px-5 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
 
           </div>
@@ -407,7 +709,7 @@ orders.filter(
                         e.target.value
                       )
                     }
-                    className="border-2 p-4 rounded-2xl"
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-800 text-white px-5 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   >
 
                     <option value="">
@@ -449,10 +751,10 @@ orders.filter(
                         e.target.value
                       )
                     }
-                    className="border-2 p-4 rounded-2xl"
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-800 text-white px-5 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
 
-<div className="border-2 p-4 rounded-2xl bg-white">
+<div className="w-full rounded-2xl border border-slate-700 bg-slate-800 text-white px-5 py-4">
 
   {item.bread_type && (
 
@@ -465,23 +767,23 @@ orders.filter(
           )?.image_url
         }
         alt={item.bread_type}
-        className="w-24 h-24 rounded-2xl object-contain bg-white p-2 border shadow-sm"
+        className="w-24 h-24 rounded-2xl object-contain bg-slate-900 p-2"
       />
 
       <div>
 
-        <p className="font-bold">
+        <p className="font-bold text-white">
           {item.bread_type}
         </p>
 
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-400">
           ₦
           {getBreadPrice(
             item.bread_type
           ).toLocaleString()}
         </p>
 
-        <p className="text-xs text-green-600">
+        <p className="text-xs text-emerald-400 font-semibold">
           Stock:
           {
             getProductDetails(
@@ -505,7 +807,7 @@ orders.filter(
                         index
                       )
                     }
-                    className="bg-red-600 hover:bg-red-700 text-white rounded-2xl font-semibold transition"
+                    className="rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold transition-all duration-300 hover:scale-105"
                   >
                     Remove
                   </button>
@@ -548,11 +850,11 @@ orders.filter(
 
         {/* ORDERS TABLE */}
 
-        <div className="bg-white rounded-3xl shadow p-8">
+        <div className="bg-slate-900 rounded-3xl shadow p-8">
 
-          <h2 className="text-3xl font-bold mb-6">
-            Customer Orders
-          </h2>
+<h2 className="text-3xl font-black text-white">
+  Customer Order History
+</h2>
 
           <div className="overflow-x-auto">
 
@@ -560,41 +862,41 @@ orders.filter(
 
 <thead>
 
-  <tr className="border-b bg-gray-50">
+  <tr className="border-b border-slate-700 bg-slate-800 text-slate-200">
 
-    <th className="p-4 text-left">
+<th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Order No
     </th>
 
-    <th className="p-4 text-left">
+<th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Customer
     </th>
 
-    <th className="p-4 text-left">
+  <th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Phone
     </th>
 
-    <th className="p-4 text-left">
+    <th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Amount
     </th>
 
-    <th className="p-4 text-left">
+    <th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Payment
     </th>
 
-    <th className="p-4 text-left">
+    <th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Status
     </th>
 
-    <th className="p-4 text-left">
+    <th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Delivery
     </th>
 
-    <th className="p-4 text-left">
+    <th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Details
     </th>
 
-    <th className="p-4 text-left">
+    <th className="p-4 text-left text-slate-300 font-semibold uppercase tracking-wider text-xs">
       Delete
     </th>
 
@@ -609,22 +911,22 @@ orders.filter(
 
                     <tr
                       key={order.id}
-                      className="border-b hover:bg-slate-50 transition"
+                      className="border-b border-slate-800 hover:bg-slate-800/60 transition-colors duration-200"
                     >
 
-                      <td className="p-4">
+                      <td className="p-4 text-slate-200">
                         {
                           order.order_number
                         }
                       </td>
 
-                      <td className="p-4">
+                      <td className="p-4 text-slate-200">
                         {
                           order.customer_name
                         }
                       </td>
 
-                      <td className="p-4">
+                      <td className="p-4 text-slate-200">
                         {order.phone}
                       </td>
 
@@ -635,7 +937,7 @@ orders.filter(
                         ).toLocaleString()}
                       </td>
 
-                      <td className="p-4">
+                      <td className="p-4 text-slate-200">
 <div
 className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
   order.order_status === "Completed"
@@ -685,7 +987,7 @@ className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
       fetchOrders();
     }}
 
-    className="border rounded-lg px-3 py-2"
+    className="w-full rounded-xl border border-slate-700 bg-slate-800 text-white px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
   >
 
     <option>
@@ -708,7 +1010,7 @@ className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
 
 </td>
 
-                     <td className="p-4">
+                     <td className="p-4 text-slate-200">
 <div
   className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
     order.order_status === "Completed"
@@ -732,6 +1034,11 @@ className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
 onChange={async (e) => {
 
   const newStatus = e.target.value;
+
+  if (newStatus === "Completed") {
+  await completeCustomerOrder(order);
+  return;
+}
 
   // Update order status
   await supabase
@@ -772,7 +1079,7 @@ onChange={async (e) => {
 
 }}
 
-    className="border rounded-lg px-3 py-2"
+    className="w-full rounded-xl border border-slate-700 bg-slate-800 text-white px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
   >
 
 <option>Pending</option>
@@ -795,13 +1102,13 @@ onChange={async (e) => {
 
 </td>
 
-                      <td className="p-4">
+                      <td className="p-4 text-slate-200">
                         {
                           order.delivery_date
                         }
                       </td>
 
-                      <td className="p-4">
+                      <td className="p-4 text-slate-200">
 
 <button
   onClick={() =>
@@ -817,7 +1124,7 @@ onChange={async (e) => {
 
 </td>
 
-<td className="p-4">
+<td className="p-4 text-slate-200">
 
   <button
     onClick={async () => {

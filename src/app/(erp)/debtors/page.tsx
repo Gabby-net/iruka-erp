@@ -1,43 +1,72 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  Users,
+  Wallet,
+  AlertTriangle,
+  Search,
+  Plus,
+} from "lucide-react";
 
 export default function DebtorsPage() {
   const [debtors, setDebtors] = useState<any[]>([]);
 
-  const [customerName, setCustomerName] =
-    useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [phone, setPhone] =
-    useState("");
+  const [search, setSearch] = useState("");
 
-  const [location, setLocation] =
-    useState("");
+  const [customerName, setCustomerName] = useState("");
 
-  const [creditLimit, setCreditLimit] =
-    useState("");
+  const [phone, setPhone] = useState("");
+
+  const [location, setLocation] = useState("");
+
+  const [creditLimit, setCreditLimit] = useState("");
+
+  const [balance, setBalance] = useState("");
+
+  const [status, setStatus] = useState("Owing");
+
+  // ================================
+// VIEW / PAYMENT STATES
+// ================================
+
+const [selectedDebtor, setSelectedDebtor] = useState<any>(null);
+
+const [viewModalOpen, setViewModalOpen] = useState(false);
+
+const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+
+const [paymentAmount, setPaymentAmount] = useState("");
+
+const [paymentLoading, setPaymentLoading] = useState(false);
 
   useEffect(() => {
     fetchDebtors();
   }, []);
 
   async function fetchDebtors() {
+    setLoading(true);
+
     const { data } = await supabase
       .from("debtors")
       .select("*")
-      .order("id", {
-        ascending: false,
-      });
+      .order("id", { ascending: false });
 
     setDebtors(data || []);
+
+    setLoading(false);
   }
 
   async function addDebtor() {
     if (!customerName) {
-      alert("Enter customer name");
+      alert("Customer name is required.");
       return;
     }
+
+    const openingBalance = Number(balance) || 0;
 
     const { error } = await supabase
       .from("debtors")
@@ -46,8 +75,12 @@ export default function DebtorsPage() {
           customer_name: customerName,
           phone,
           location,
-          credit_limit:
-            Number(creditLimit) || 0,
+          credit_limit: Number(creditLimit) || 0,
+          balance: openingBalance,
+          status:
+            openingBalance === 0
+              ? "Paid"
+              : "Owing",
         },
       ]);
 
@@ -60,195 +93,955 @@ export default function DebtorsPage() {
     setPhone("");
     setLocation("");
     setCreditLimit("");
+    setBalance("");
+    setStatus("Owing");
 
     fetchDebtors();
   }
 
-  const totalDebt =
-    debtors.reduce(
-      (sum, d) =>
-        sum + Number(d.balance || 0),
-      0
+  const totalDebt = debtors.reduce(
+    (sum, debtor) => sum + Number(debtor.balance || 0),
+    0
+  );
+
+  const overdueAccounts = debtors.filter(
+    (d) =>
+      d.status === "Overdue"
+  ).length;
+
+const filteredDebtors = useMemo(() => {
+  const query = search.toLowerCase().trim();
+
+  return debtors.filter((d) => {
+    return (
+      d.customer_name?.toLowerCase().includes(query) ||
+      d.phone?.toLowerCase().includes(query) ||
+      d.location?.toLowerCase().includes(query) ||
+      d.status?.toLowerCase().includes(query)
     );
-
+  });
+}, [debtors, search]);
   return (
-    <div className="space-y-8">
+<div className="space-y-8">
 
-      <h1 className="text-4xl font-bold">
-        Debtors Management
-      </h1>
 
-      <div className="grid md:grid-cols-3 gap-6">
+{/* ==========================
+    PREMIUM HEADER
+========================== */}
 
-        <div className="bg-white p-6 rounded-2xl shadow">
-          <p>Total Debtors</p>
-          <h2 className="text-3xl font-bold">
-            {debtors.length}
-          </h2>
-        </div>
+<div className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#071426] via-[#0B1F3A] to-[#102B52] p-10 shadow-2xl border border-white/10">
 
-        <div className="bg-white p-6 rounded-2xl shadow">
-          <p>Total Outstanding</p>
-          <h2 className="text-3xl font-bold text-red-600">
-            ₦{totalDebt.toLocaleString()}
-          </h2>
-        </div>
+  {/* Background Glow */}
 
-        <div className="bg-white p-6 rounded-2xl shadow">
-          <p>Active Accounts</p>
-          <h2 className="text-3xl font-bold text-green-600">
-            {debtors.length}
-          </h2>
+  <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-blue-500/20 blur-3xl" />
+
+  <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-cyan-400/10 blur-3xl" />
+
+  <div className="absolute right-10 top-6 w-40 h-1 rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 rotate-[-18deg]" />
+
+  <div className="absolute right-8 top-10 w-40 h-[2px] rounded-full bg-yellow-200/60 rotate-[-18deg]" />
+
+  <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-8">
+
+    {/* LEFT */}
+
+    <div className="flex items-center gap-6">
+
+      <div className="relative">
+
+        <div className="absolute inset-0 rounded-full bg-yellow-400/20 blur-xl scale-150" />
+
+        <div className="relative w-20 h-20 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center">
+
+          <img
+            src="/logo/nkiruka-logo.png"
+            alt="NKIRUKA"
+            className="w-16 h-16 object-contain"
+          />
+
         </div>
 
       </div>
 
-      <div className="bg-white p-6 rounded-2xl shadow">
+      <div>
 
-        <h2 className="text-2xl font-bold mb-6">
-          Add Debtor
-        </h2>
+        <span className="inline-flex items-center rounded-full bg-orange-500/20 border border-orange-400/30 px-4 py-1 text-xs font-bold uppercase tracking-[0.25em] text-orange-300">
 
-        <div className="grid md:grid-cols-4 gap-4">
+          Credit Management
 
-          <input
-            placeholder="Customer Name"
-            value={customerName}
-            onChange={(e) =>
-              setCustomerName(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
+        </span>
 
-          <input
-            placeholder="Phone"
-            value={phone}
-            onChange={(e) =>
-              setPhone(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
+        <h1 className="text-5xl font-black text-white mt-4 tracking-tight">
 
-          <input
-            placeholder="Location"
-            value={location}
-            onChange={(e) =>
-              setLocation(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
+          Debtors Management
 
-          <input
-            placeholder="Credit Limit"
-            value={creditLimit}
-            onChange={(e) =>
-              setCreditLimit(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
+        </h1>
 
-        </div>
+        <p className="text-slate-300 text-lg mt-3 max-w-2xl leading-8">
 
-        <button
-          onClick={addDebtor}
-          className="mt-6 bg-blue-950 text-white px-6 py-3 rounded-xl"
-        >
-          Add Debtor
-        </button>
+          Manage customer credit accounts, monitor outstanding balances, receive repayments and track overdue accounts across NKIRUKA INDUSTRIES LTD.
 
-      </div>
-
-      <div className="bg-white p-6 rounded-2xl shadow overflow-x-auto">
-
-        <h2 className="text-2xl font-bold mb-6">
-          Debtors List
-        </h2>
-
-        <table className="w-full">
-
-          <thead>
-
-            <tr>
-
-              <th className="text-left p-4">
-                Customer
-              </th>
-
-              <th className="text-left p-4">
-                Phone
-              </th>
-
-              <th className="text-left p-4">
-                Location
-              </th>
-
-              <th className="text-left p-4">
-                Credit Limit
-              </th>
-
-              <th className="text-left p-4">
-                Balance
-              </th>
-
-              <th className="text-left p-4">
-                Status
-              </th>
-
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            {debtors.map((debtor) => (
-
-              <tr
-                key={debtor.id}
-                className="border-t"
-              >
-
-                <td className="p-4">
-                  {debtor.customer_name}
-                </td>
-
-                <td className="p-4">
-                  {debtor.phone}
-                </td>
-
-                <td className="p-4">
-                  {debtor.location}
-                </td>
-
-                <td className="p-4">
-                  ₦{debtor.credit_limit}
-                </td>
-
-                <td className="p-4 font-bold text-red-600">
-                  ₦{debtor.balance}
-                </td>
-
-                <td className="p-4">
-                  {debtor.status}
-                </td>
-
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
+        </p>
 
       </div>
 
     </div>
-  );
+
+    {/* RIGHT */}
+
+    <div className="grid grid-cols-2 gap-5">
+
+      <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-5 min-w-[180px]">
+
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+          Active Debtors
+
+        </p>
+
+        <h2 className="text-4xl font-black text-white mt-3">
+
+          {debtors.length}
+
+        </h2>
+
+      </div>
+
+      <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-5 min-w-[180px]">
+
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+          Outstanding Debt
+
+        </p>
+
+        <h2 className="text-3xl font-black text-red-400 mt-3">
+
+          ₦{totalDebt.toLocaleString()}
+
+        </h2>
+
+      </div>
+
+      <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-5">
+
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+          Overdue
+
+        </p>
+
+        <h2 className="text-4xl font-black text-orange-400 mt-3">
+
+          {overdueAccounts}
+
+        </h2>
+
+      </div>
+
+      <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-5">
+
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+          Credit Health
+
+        </p>
+
+        <h2 className="text-3xl font-black text-emerald-400 mt-3">
+
+          {debtors.length === 0
+            ? "100%"
+            : `${Math.round(
+                ((debtors.length - overdueAccounts) /
+                  debtors.length) *
+                  100
+              )}%`}
+
+        </h2>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{/* ==========================
+    PREMIUM KPI CARDS
+========================== */}
+
+<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-7">
+
+  {/* Total Debtors */}
+
+  <div className="group relative overflow-hidden rounded-[30px] bg-gradient-to-br from-blue-500 to-indigo-700 p-[1px] shadow-2xl">
+
+    <div className="rounded-[30px] bg-[#0D1728] p-7 h-full">
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <p className="text-blue-300 text-sm uppercase tracking-[0.25em]">
+
+            Total Debtors
+
+          </p>
+
+          <h2 className="text-5xl font-black text-white mt-4">
+
+            {debtors.length}
+
+          </h2>
+
+          <p className="text-slate-400 mt-3">
+
+            Customer Credit Accounts
+
+          </p>
+
+        </div>
+
+        <div className="w-20 h-20 rounded-3xl bg-blue-500/20 flex items-center justify-center">
+
+          <Users
+            size={40}
+            className="text-blue-300"
+          />
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* Outstanding Debt */}
+
+  <div className="group relative overflow-hidden rounded-[30px] bg-gradient-to-br from-red-500 to-rose-700 p-[1px] shadow-2xl">
+
+    <div className="rounded-[30px] bg-[#0D1728] p-7 h-full">
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <p className="text-red-300 text-sm uppercase tracking-[0.25em]">
+
+            Outstanding Debt
+
+          </p>
+
+          <h2 className="text-4xl font-black text-white mt-4">
+
+            ₦{totalDebt.toLocaleString()}
+
+          </h2>
+
+          <p className="text-slate-400 mt-3">
+
+            Total Customer Balance
+
+          </p>
+
+        </div>
+
+        <div className="w-20 h-20 rounded-3xl bg-red-500/20 flex items-center justify-center">
+
+          <Wallet
+            size={40}
+            className="text-red-300"
+          />
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* Overdue Accounts */}
+
+  <div className="group relative overflow-hidden rounded-[30px] bg-gradient-to-br from-orange-500 to-amber-700 p-[1px] shadow-2xl">
+
+    <div className="rounded-[30px] bg-[#0D1728] p-7 h-full">
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <p className="text-orange-300 text-sm uppercase tracking-[0.25em]">
+
+            Overdue Accounts
+
+          </p>
+
+          <h2 className="text-5xl font-black text-white mt-4">
+
+            {overdueAccounts}
+
+          </h2>
+
+          <p className="text-slate-400 mt-3">
+
+            Immediate Follow-up Required
+
+          </p>
+
+        </div>
+
+        <div className="w-20 h-20 rounded-3xl bg-orange-500/20 flex items-center justify-center">
+
+          <AlertTriangle
+            size={40}
+            className="text-orange-300"
+          />
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{/* ==========================
+    PREMIUM ADD / EDIT DEBTOR
+========================== */}
+
+<div className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#071426] via-[#0C1D36] to-[#122C4B] border border-white/10 shadow-2xl">
+
+  {/* Glow */}
+
+  <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl" />
+
+  <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl" />
+
+  <div className="relative p-10">
+
+    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-10">
+
+      <div>
+
+        <span className="inline-flex px-4 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold uppercase tracking-[0.25em]">
+
+          Customer Credit
+
+        </span>
+
+        <h2 className="text-4xl font-black text-white mt-4">
+
+          Add / Edit Debtor
+
+        </h2>
+
+        <p className="text-slate-400 mt-3 text-lg">
+
+          Register new customer credit accounts and manage their outstanding balances.
+
+        </p>
+
+      </div>
+
+      <button
+        onClick={addDebtor}
+        className="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800 text-white font-bold shadow-xl flex items-center gap-3 transition-all duration-300"
+      >
+
+        <Plus size={20} />
+
+        Save Debtor
+
+      </button>
+
+    </div>
+
+    <div className="grid lg:grid-cols-2 gap-8">
+
+      {/* Customer */}
+
+      <div>
+
+        <label className="block text-sm font-semibold text-slate-300 mb-3">
+
+          Customer Name
+
+        </label>
+
+        <input
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          placeholder="Enter customer name"
+          className="w-full rounded-2xl border border-white/10 bg-[#162844] px-5 py-4 text-white placeholder:text-slate-500 outline-none focus:border-blue-500"
+        />
+
+      </div>
+
+      {/* Phone */}
+
+      <div>
+
+        <label className="block text-sm font-semibold text-slate-300 mb-3">
+
+          Phone Number
+
+        </label>
+
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="080xxxxxxxx"
+          className="w-full rounded-2xl border border-white/10 bg-[#162844] px-5 py-4 text-white placeholder:text-slate-500 outline-none focus:border-blue-500"
+        />
+
+      </div>
+
+      {/* Location */}
+
+      <div>
+
+        <label className="block text-sm font-semibold text-slate-300 mb-3">
+
+          Customer Location
+
+        </label>
+
+        <input
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Customer location"
+          className="w-full rounded-2xl border border-white/10 bg-[#162844] px-5 py-4 text-white placeholder:text-slate-500 outline-none focus:border-blue-500"
+        />
+
+      </div>
+
+      {/* Credit Limit */}
+
+      <div>
+
+        <label className="block text-sm font-semibold text-slate-300 mb-3">
+
+          Credit Limit
+
+        </label>
+
+        <input
+          value={creditLimit}
+          onChange={(e) => setCreditLimit(e.target.value)}
+          type="number"
+          placeholder="₦500000"
+          className="w-full rounded-2xl border border-white/10 bg-[#162844] px-5 py-4 text-white placeholder:text-slate-500 outline-none focus:border-blue-500"
+        />
+
+      </div>
+
+      {/* Opening Balance */}
+
+      <div>
+
+        <label className="block text-sm font-semibold text-red-300 mb-3">
+
+          Opening Balance Owed
+
+        </label>
+
+        <input
+          value={balance}
+          onChange={(e) => setBalance(e.target.value)}
+          type="number"
+          placeholder="₦0"
+          className="w-full rounded-2xl border border-red-500/30 bg-[#162844] px-5 py-4 text-white placeholder:text-slate-500 outline-none focus:border-red-500"
+        />
+
+        <p className="text-xs text-slate-500 mt-3">
+
+          Enter the amount the customer currently owes the company.
+
+        </p>
+
+      </div>
+
+      {/* Status */}
+
+      <div>
+
+        <label className="block text-sm font-semibold text-slate-300 mb-3">
+
+          Status
+
+        </label>
+
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="w-full rounded-2xl border border-white/10 bg-[#162844] px-5 py-4 text-white outline-none focus:border-blue-500"
+        >
+
+          <option>Paid</option>
+
+          <option>Owing</option>
+
+          <option>Overdue</option>
+
+        </select>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{/* ==========================
+    PREMIUM SEARCH
+========================== */}
+
+<div className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#071426] via-[#0C1D36] to-[#122C4B] border border-white/10 shadow-2xl">
+
+  <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-blue-500/10 blur-3xl" />
+
+  <div className="relative p-6">
+
+    <div className="flex items-center gap-5">
+
+      <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center">
+
+        <Search
+          size={24}
+          className="text-blue-300"
+        />
+
+      </div>
+
+      <div className="flex-1">
+
+        <p className="text-xs uppercase tracking-[0.25em] text-slate-400 mb-2">
+
+          Search Debtors
+
+        </p>
+
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by customer name or phone number..."
+          className="w-full rounded-2xl border border-white/10 bg-[#162844] px-5 py-4 text-white placeholder:text-slate-500 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
+        />
+
+      </div>
+
+      <div className="hidden lg:block text-right">
+
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+
+          Results
+
+        </p>
+
+        <h2 className="text-3xl font-black text-white">
+
+          {filteredDebtors.length}
+
+        </h2>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{/* ==========================
+    PREMIUM DEBTORS TABLE
+========================== */}
+
+<div className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#071426] via-[#0C1D36] to-[#122C4B] border border-white/10 shadow-2xl">
+
+  {/* Decorative Glow */}
+
+  <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl" />
+
+  <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl" />
+
+  <div className="relative">
+
+    {/* Header */}
+
+    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 px-8 py-8 border-b border-white/10">
+
+      <div>
+
+        <span className="inline-flex px-4 py-1 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-bold uppercase tracking-[0.25em]">
+
+          Customer Credit Ledger
+
+        </span>
+
+        <h2 className="text-4xl font-black text-white mt-4">
+
+          Debtors List
+
+        </h2>
+
+        <p className="text-slate-400 mt-2">
+
+          Manage customer credit accounts, repayments and outstanding balances.
+
+        </p>
+
+      </div>
+
+      <div className="flex gap-4">
+
+        <div className="rounded-3xl bg-white/5 border border-white/10 px-6 py-5">
+
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+            Showing
+
+          </p>
+
+          <h3 className="text-3xl font-black text-white mt-2">
+
+            {filteredDebtors.length}
+
+          </h3>
+
+        </div>
+
+        <div className="rounded-3xl bg-white/5 border border-white/10 px-6 py-5">
+
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+            Outstanding
+
+          </p>
+
+          <h3 className="text-2xl font-black text-red-400 mt-2">
+
+            ₦{totalDebt.toLocaleString()}
+
+          </h3>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    {/* TABLE */}
+
+    <div className="overflow-x-auto">
+
+      <table className="w-full min-w-[1350px]">
+
+        <thead>
+
+          <tr className="bg-[#132844] border-b border-white/10">
+
+            <th className="px-8 py-5 text-left text-slate-300 uppercase tracking-[0.2em] text-xs">
+
+              Customer
+
+            </th>
+
+            <th className="px-8 py-5 text-left text-slate-300 uppercase tracking-[0.2em] text-xs">
+
+              Phone
+
+            </th>
+
+            <th className="px-8 py-5 text-left text-slate-300 uppercase tracking-[0.2em] text-xs">
+
+              Location
+
+            </th>
+
+            <th className="px-8 py-5 text-left text-slate-300 uppercase tracking-[0.2em] text-xs">
+
+              Credit Limit
+
+            </th>
+
+            <th className="px-8 py-5 text-left text-slate-300 uppercase tracking-[0.2em] text-xs">
+
+              Balance Owed
+
+            </th>
+
+            <th className="px-8 py-5 text-left text-slate-300 uppercase tracking-[0.2em] text-xs">
+
+              Status
+
+            </th>
+
+            <th className="px-8 py-5 text-center text-slate-300 uppercase tracking-[0.2em] text-xs">
+
+              Actions
+
+            </th>
+
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+          {loading ? (
+
+            <tr>
+
+              <td
+                colSpan={7}
+                className="py-20 text-center text-slate-400"
+              >
+
+                Loading customer credit accounts...
+
+              </td>
+
+            </tr>
+
+          ) : filteredDebtors.length === 0 ? (
+
+            <tr>
+
+              <td
+                colSpan={7}
+                className="py-24"
+              >
+
+                <div className="flex flex-col items-center">
+
+                  <Users
+                    size={70}
+                    className="text-slate-600"
+                  />
+
+                  <h3 className="text-2xl font-bold text-white mt-6">
+
+                    No Debtors Found
+
+                  </h3>
+
+                  <p className="text-slate-400 mt-3">
+
+                    Register your first customer credit account.
+
+                  </p>
+
+                </div>
+
+              </td>
+
+            </tr>
+
+          ) : (
+
+            filteredDebtors.map((debtor) => (
+
+              <tr
+                key={debtor.id}
+                className="border-b border-white/5 hover:bg-white/5 transition-all duration-300"
+              >
+                <td className="px-8 py-6">
+
+  <div className="flex items-center gap-4">
+
+    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center font-bold text-white text-lg shadow-lg">
+
+      {debtor.customer_name?.charAt(0)?.toUpperCase()}
+
+    </div>
+
+    <div>
+
+      <h3 className="text-white font-bold text-lg">
+
+        {debtor.customer_name}
+
+      </h3>
+
+      <p className="text-slate-400 text-sm">
+
+        Customer ID #{debtor.id}
+
+      </p>
+
+    </div>
+
+  </div>
+
+</td>
+
+<td className="px-8 py-6">
+
+  <div className="text-slate-200 font-medium">
+
+    {debtor.phone || "--"}
+
+  </div>
+
+</td>
+
+<td className="px-8 py-6">
+
+  <div className="text-slate-300">
+
+    {debtor.location || "--"}
+
+  </div>
+
+</td>
+
+<td className="px-8 py-6">
+
+  <span className="font-bold text-blue-300 text-lg">
+
+    ₦{Number(debtor.credit_limit || 0).toLocaleString()}
+
+  </span>
+
+</td>
+
+<td className="px-8 py-6">
+
+  <span
+    className={`font-black text-lg ${
+      Number(debtor.balance) > 0
+        ? "text-red-400"
+        : "text-emerald-400"
+    }`}
+  >
+
+    ₦{Number(debtor.balance || 0).toLocaleString()}
+
+  </span>
+
+</td>
+
+<td className="px-8 py-6">
+
+  {Number(debtor.balance) === 0 ? (
+
+    <span className="inline-flex items-center rounded-full bg-emerald-500/20 border border-emerald-400/30 px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-300">
+
+      Paid
+
+    </span>
+
+  ) : Number(debtor.balance) >= Number(debtor.credit_limit) ? (
+
+    <span className="inline-flex items-center rounded-full bg-red-500/20 border border-red-400/30 px-4 py-2 text-xs font-bold uppercase tracking-wider text-red-300">
+
+      Overdue
+
+    </span>
+
+  ) : (
+
+    <span className="inline-flex items-center rounded-full bg-orange-500/20 border border-orange-400/30 px-4 py-2 text-xs font-bold uppercase tracking-wider text-orange-300">
+
+      Owing
+
+    </span>
+
+  )}
+
+</td>
+
+<td className="px-8 py-6">
+
+  <div className="flex items-center justify-center gap-2">
+
+    <button
+      className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition-all"
+    >
+      View
+    </button>
+
+    <button
+      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
+    >
+      Payment
+    </button>
+
+    <button
+      className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-sm font-semibold transition-all"
+    >
+      Edit
+    </button>
+
+    <button
+      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-all"
+    >
+      Delete
+    </button>
+
+  </div>
+
+</td>
+
+</tr>
+
+))
+
+)}
+
+</tbody>
+
+</table>
+
+</div>
+
+{/* Footer */}
+
+<div className="border-t border-white/10 bg-[#10243F] px-8 py-6 flex items-center justify-between">
+
+  <p className="text-slate-400">
+
+    Showing
+
+    <span className="mx-2 font-bold text-white">
+
+      {filteredDebtors.length}
+
+    </span>
+
+    customer account(s)
+
+  </p>
+
+  <div className="flex gap-3">
+
+    <button className="px-5 py-2 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition">
+
+      Previous
+
+    </button>
+
+    <button className="px-5 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white transition">
+
+      Next
+
+    </button>
+
+  </div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+);
 }

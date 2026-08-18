@@ -1,564 +1,567 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import ProtectedRoute from "@/components/ProtectedRoute";
-
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+import ExecutiveHeader from "@/components/analytics/ExecutiveHeader";
+import ExecutiveCards from "@/components/analytics/ExecutiveCards";
+import FinancialHealth from "@/components/analytics/FinancialHealth";
+import InventoryHealth from "@/components/analytics/InventoryHealth";
+import CustomerAnalytics from "@/components/analytics/CustomerAnalytics";
+import BestSellingProducts from "@/components/analytics/BestSellingProducts";
+import TopCustomers from "@/components/analytics/TopCustomers";
+import CEOActionCenter from "@/components/analytics/CEOActionCenter";
+import BusinessGrowthIndex from "@/components/analytics/BusinessGrowthIndex";
+import AIBusinessForecast from "@/components/analytics/AIBusinessForecast";
+
+import RevenueChart from "@/components/analytics/RevenueChart";
+import ProductionChart from "@/components/analytics/ProductionChart";
+import SalesChart from "@/components/analytics/SalesChart";
+import CustomerGrowthChart from "@/components/analytics/CustomerGrowthChart";
+import InventoryChart from "@/components/analytics/InventoryChart";
+
+type Period = "today" | "week" | "month" | "year";
+
 export default function AnalyticsPage() {
+  const [period, setPeriod] = useState<Period>("today");
 
-  const [sales, setSales] =
-    useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [products, setProducts] =
-    useState<any[]>([]);
+  const [sales, setSales] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [production, setProduction] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [finance, setFinance] = useState<any[]>([]);
 
-  const [inventory, setInventory] =
-    useState<any[]>([]);
-
-  const [productionLogs, setProductionLogs] =
-    useState<any[]>([]);
-
-  const [totalRevenue, setTotalRevenue] =
-    useState(0);
-
-  const [todayRevenue, setTodayRevenue] =
-    useState(0);
-
-  const [totalOrders, setTotalOrders] =
-    useState(0);
-
-  const [outstandingBalance, setOutstandingBalance] =
-    useState(0);
-
-  useEffect(() => {
-
-    fetchAnalytics();
-
-  }, []);
+useEffect(() => {
+  fetchAnalytics();
+}, [period]);
 
   async function fetchAnalytics() {
+    setLoading(true);
+    let startDate = new Date();
 
-    /* =========================
-       FETCH SALES
-    ========================== */
+switch (period) {
+  case "today":
+    startDate.setHours(0, 0, 0, 0);
+    break;
 
-    const {
-      data: salesData,
-    } = await supabase
+  case "week":
+    startDate.setDate(startDate.getDate() - 7);
+    break;
 
-      .from("sales")
+  case "month":
+    startDate.setMonth(startDate.getMonth() - 1);
+    break;
 
-      .select("*");
+  case "year":
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    break;
+}
 
-    /* =========================
-       FETCH PRODUCTS
-    ========================== */
+const fromDate = startDate.toISOString();
 
-    const {
-      data: productsData,
-    } = await supabase
+const [
+  salesRes,
+  ordersRes,
+  customersRes,
+  productsRes,
+  productionRes,
+  inventoryRes,
+  financeRes,
+] = await Promise.all([
+supabase
+  .from("sales")
+  .select("*")
+  .gte("created_at", fromDate)
+  .order("created_at", { ascending: false }),
 
-      .from("products")
+supabase
+  .from("orders")
+  .select("*")
+  .gte("created_at", fromDate)
+  .order("created_at", { ascending: false }),
 
-      .select("*");
+supabase
+  .from("customers")
+  .select("*")
+  .gte("created_at", fromDate)
+  .order("created_at", { ascending: false }),
 
-    /* =========================
-       FETCH INVENTORY
-    ========================== */
+  supabase
+    .from("products")
+    .select("*"),
 
-    const {
-      data: inventoryData,
-    } = await supabase
+supabase
+  .from("production_logs")
+  .select("*")
+  .gte("created_at", fromDate)
+  .order("created_at", { ascending: false }),
 
-      .from("inventory")
+supabase
+  .from("inventory")
+  .select("*"),
 
-      .select("*");
+supabase
+  .from("finance_transactions")
+  .select("*")
+  .gte("created_at", fromDate)
+  .order("created_at", { ascending: false }),
+]);
 
-    /* =========================
-       FETCH PRODUCTION
-    ========================== */
+    setSales(salesRes.data || []);
+    setOrders(ordersRes.data || []);
+    setCustomers(customersRes.data || []);
+    setProducts(productsRes.data || []);
+    setProduction(productionRes.data || []);
+    setInventory(inventoryRes.data || []);
+    setFinance(financeRes.data || []);
 
-    const {
-      data: productionData,
-    } = await supabase
+    if (salesRes.error) console.error("Sales:", salesRes.error);
 
-      .from("production_logs")
+if (ordersRes.error) console.error("Orders:", ordersRes.error);
 
-      .select("*");
+if (customersRes.error) console.error("Customers:", customersRes.error);
 
-    setSales(salesData || []);
+if (productsRes.error) console.error("Products:", productsRes.error);
 
-    setProducts(productsData || []);
+if (productionRes.error) console.error("Production:", productionRes.error);
 
-    setInventory(
-      inventoryData || []
-    );
+if (inventoryRes.error) console.error("Inventory:", inventoryRes.error);
 
-    setProductionLogs(
-      productionData || []
-    );
+if (financeRes.error) console.error("Finance:", financeRes.error);
 
-    /* =========================
-       TOTAL REVENUE
-    ========================== */
-
-    const revenue =
-      (salesData || []).reduce(
-        (sum, sale) =>
-          sum +
-          Number(
-            sale.total_amount
-          ),
-        0
-      );
-
-    setTotalRevenue(
-      revenue
-    );
-
-    /* =========================
-       TODAY REVENUE
-    ========================== */
-
-    const today =
-      new Date()
-        .toISOString()
-        .split("T")[0];
-
-    const todaySales =
-      (salesData || []).filter(
-        (sale) =>
-          sale.created_at
-            ?.split("T")[0] ===
-          today
-      );
-
-    const todayTotal =
-      todaySales.reduce(
-        (sum, sale) =>
-          sum +
-          Number(
-            sale.total_amount
-          ),
-        0
-      );
-
-    setTodayRevenue(
-      todayTotal
-    );
-
-    /* =========================
-       TOTAL ORDERS
-    ========================== */
-
-    setTotalOrders(
-      salesData?.length || 0
-    );
-
-    /* =========================
-       OUTSTANDING BALANCE
-    ========================== */
-
-    const balances =
-      (salesData || []).reduce(
-        (sum, sale) =>
-          sum +
-          Number(
-            sale.balance
-          ),
-        0
-      );
-
-    setOutstandingBalance(
-      balances
-    );
+    setLoading(false);
   }
 
-  /* =========================
-     LOW STOCK ITEMS
-  ========================== */
+const totalRevenue = useMemo(() => {
+  return sales.reduce(
+    (sum, sale) => sum + Number(sale.total_amount || 0),
+    0
+  );
+}, [sales]);
 
-  const lowStockItems =
-    inventory.filter(
-      (item) =>
-        Number(item.quantity) <
-        10
+  const totalExpenses = useMemo(() => {
+    return finance
+      .filter((x) => x.type === "expense")
+      .reduce((a, b) => a + Number(b.amount || 0), 0);
+  }, [finance]);
+
+  const totalProfit = totalRevenue - totalExpenses;
+
+  const totalOrders = useMemo(() => {
+  return orders.length;
+}, [orders]);
+
+  const totalCustomers = useMemo(() => {
+  return customers.length;
+}, [customers]);
+
+  const totalProducts = useMemo(() => {
+  return products.length;
+}, [products]);
+
+const totalProduction = useMemo(() => {
+  const today = new Date().toISOString().split("T")[0];
+
+  return production
+    .filter((item) => item.production_date === today)
+    .reduce(
+      (sum, item) => sum + Number(item.quantity || 0),
+      0
+    );
+}, [production]);
+
+const inventoryValue = useMemo(() => {
+  return inventory.reduce(
+    (sum, item) =>
+      sum +
+      Number(item.quantity || 0) *
+      Number(item.unit_cost || 0),
+    0
+  );
+}, [inventory]);
+
+const lowStockItems = useMemo(() => {
+  return inventory.filter(
+    (item) =>
+      Number(item.quantity || 0) <=
+      Number(item.reorder_level || 0)
+  ).length;
+}, [inventory]);
+const revenueChartData = useMemo(() => {
+
+  const months = [
+    "Jan","Feb","Mar","Apr","May","Jun",
+    "Jul","Aug","Sep","Oct","Nov","Dec"
+  ];
+
+  return months.map((month, index) => {
+
+    const monthSales = sales.filter((sale: any) => {
+
+      if (!sale.created_at) return false;
+
+      return new Date(sale.created_at).getMonth() === index;
+
+    });
+
+    const monthExpenses = finance.filter((item: any) => {
+
+      if (!item.created_at) return false;
+
+      return (
+        item.type?.toLowerCase() === "expense" &&
+        new Date(item.created_at).getMonth() === index
+      );
+
+    });
+
+    const revenue = monthSales.reduce(
+
+      (sum, sale) => sum + Number(sale.total_amount || 0),
+
+      0
+
     );
 
-  /* =========================
-     BEST SELLING PRODUCT
-  ========================== */
+    const expenses = monthExpenses.reduce(
 
-  const bestSelling =
-    products.sort(
-      (a, b) =>
-        Number(b.stock) -
-        Number(a.stock)
-    )[0];
+      (sum, item) => sum + Number(item.amount || 0),
 
-  return (
+      0
 
-    <ProtectedRoute
-      allowedRoles={[
-        "admin",
-        "accountant",
-      ]}
-    >
+    );
 
-      <div className="p-10 bg-gray-100 min-h-screen">
+    return {
 
-        {/* HEADER */}
+      name: month,
 
-        <div className="mb-10">
+      revenue,
 
-          <h1 className="text-5xl font-black text-blue-950">
+      expenses,
 
-            Executive Analytics
+      profit: revenue - expenses,
 
-          </h1>
+    };
 
-          <p className="text-gray-600 mt-2 text-lg">
+  });
 
-            CEO enterprise bakery insights dashboard
+}, [sales, finance]);
 
-          </p>
+const productionChartData = useMemo(() => {
+  return production.map((item: any) => ({
+    product: item.bread,
+    produced: Number(item.quantity || 0),
+    waste: Number(item.waste_quantity || 0),
+  }));
+}, [production]);
 
-        </div>
+  const salesChartData = useMemo(() => {
+    return sales.map((item: any) => ({
+      product: item.product_name,
+      quantity: Number(item.quantity || 0),
+      revenue: Number(item.total_amount || 0),
+    }));
+  }, [sales]);
 
-        {/* KPI CARDS */}
+const customerPerformanceChartData = useMemo(() => {
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
 
-          {/* TOTAL REVENUE */}
+  return months.map((month, index) => {
+
+    const monthOrders = orders.filter((order: any) => {
+
+      if (!order.created_at) return false;
+
+      return new Date(order.created_at).getMonth() === index;
 
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-gray-500 text-lg">
-
-              Total Revenue
-
-            </h2>
-
-            <p className="text-4xl font-black text-green-700 mt-4">
-
-              ₦
-              {totalRevenue.toLocaleString()}
-
-            </p>
-
-          </div>
-
-          {/* TODAY REVENUE */}
-
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-gray-500 text-lg">
-
-              Today's Revenue
-
-            </h2>
-
-            <p className="text-4xl font-black text-blue-700 mt-4">
-
-              ₦
-              {todayRevenue.toLocaleString()}
-
-            </p>
-
-          </div>
-
-          {/* TOTAL ORDERS */}
-
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-gray-500 text-lg">
-
-              Total Transactions
-
-            </h2>
-
-            <p className="text-4xl font-black text-purple-700 mt-4">
-
-              {totalOrders}
-
-            </p>
-
-          </div>
-
-          {/* OUTSTANDING */}
-
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-gray-500 text-lg">
-
-              Outstanding Debt
-
-            </h2>
-
-            <p className="text-4xl font-black text-red-600 mt-4">
-
-              ₦
-              {outstandingBalance.toLocaleString()}
-
-            </p>
-
-          </div>
-
-        </div>
-
-        {/* SECOND ROW */}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-
-          {/* BEST SELLING */}
-
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-3xl font-bold mb-6">
-
-              Best Selling Product
-
-            </h2>
-
-            {bestSelling ? (
-
-              <div>
-
-                <p className="text-4xl font-black text-blue-950">
-
-                  {bestSelling.name}
-
-                </p>
-
-                <p className="text-gray-600 mt-3 text-xl">
-
-                  Remaining Stock:
-                  {" "}
-                  {bestSelling.stock}
-
-                </p>
-
-              </div>
-
-            ) : (
-
-              <p>No products found</p>
-
-            )}
-
-          </div>
-
-          {/* PRODUCTION */}
-
-          <div className="bg-white rounded-3xl shadow p-8">
-
-            <h2 className="text-3xl font-bold mb-6">
-
-              Production Summary
-
-            </h2>
-
-            <p className="text-5xl font-black text-green-700">
-
-              {
-                productionLogs.length
-              }
-
-            </p>
-
-            <p className="text-gray-600 mt-3 text-xl">
-
-              Total Production Logs
-
-            </p>
-
-          </div>
-
-        </div>
-
-        {/* LOW STOCK ALERTS */}
-
-        <div className="bg-white rounded-3xl shadow p-8 mb-10">
-
-          <h2 className="text-3xl font-bold text-red-600 mb-6">
-
-            Low Stock Alerts
-
-          </h2>
-
-          {lowStockItems.length === 0 ? (
-
-            <p className="text-green-700 font-bold text-xl">
-
-              No low stock items
-
-            </p>
-
-          ) : (
-
-            <div className="flex flex-col gap-4">
-
-              {lowStockItems.map(
-                (item) => (
-
-                  <div
-                    key={item.id}
-                    className="bg-red-50 border border-red-200 p-5 rounded-2xl"
-                  >
-
-                    <p className="text-2xl font-bold text-red-700">
-
-                      {item.name}
-
-                    </p>
-
-                    <p className="text-gray-700 mt-2">
-
-                      Remaining:
-                      {" "}
-                      {item.quantity}
-                      {" "}
-                      {item.unit}
-
-                    </p>
-
-                  </div>
-                )
-              )}
-
-            </div>
-
-          )}
-
-        </div>
-
-        {/* RECENT SALES */}
-
-        <div className="bg-white rounded-3xl shadow p-8">
-
-          <div className="flex justify-between items-center mb-6">
-
-            <h2 className="text-3xl font-bold">
-
-              Recent Transactions
-
-            </h2>
-
-            <div className="bg-blue-950 text-white px-5 py-3 rounded-2xl font-bold">
-
-              {sales.length} Records
-
-            </div>
-
-          </div>
-
-          <div className="overflow-x-auto">
-
-            <table className="w-full">
-
-              <thead>
-
-                <tr className="border-b bg-gray-50">
-
-                  <th className="p-4 text-left">
-
-                    Customer
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Revenue
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Payment
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Balance
-
-                  </th>
-
-                  <th className="p-4 text-left">
-
-                    Date
-
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {sales.map((sale) => (
-
-                  <tr
-                    key={sale.id}
-                    className="border-b hover:bg-gray-50"
-                  >
-
-                    <td className="p-4 font-semibold">
-
-                      {sale.customer_name}
-
-                    </td>
-
-                    <td className="p-4 text-green-700 font-bold">
-
-                      ₦
-                      {Number(
-                        sale.total_amount
-                      ).toLocaleString()}
-
-                    </td>
-
-                    <td className="p-4 text-blue-700 font-bold">
-
-                      ₦
-                      {Number(
-                        sale.payment
-                      ).toLocaleString()}
-
-                    </td>
-
-                    <td className="p-4 text-red-600 font-bold">
-
-                      ₦
-                      {Number(
-                        sale.balance
-                      ).toLocaleString()}
-
-                    </td>
-
-                    <td className="p-4">
-
-                      {new Date(
-                        sale.created_at
-                      ).toLocaleString()}
-
-                    </td>
-
-                  </tr>
-                ))}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        </div>
+    });
+
+    return {
+
+      month,
+
+      orders: monthOrders.length,
+
+    };
+
+  });
+
+}, [orders]);
+
+const inventoryChartData = useMemo(() => {
+  return inventory.map((item: any) => ({
+    name: item.material_name || item.name,
+    value: Number(item.current_stock || item.quantity || 0),
+  }));
+}, [inventory]);
+
+  const bestSellingProducts = useMemo(() => {
+    const grouped: Record<
+      string,
+      {
+        quantity: number;
+        revenue: number;
+      }
+    > = {};
+
+    sales.forEach((sale: any) => {
+      const product = sale.product_name;
+
+      if (!grouped[product]) {
+        grouped[product] = {
+          quantity: 0,
+          revenue: 0,
+        };
+      }
+
+      grouped[product].quantity += Number(
+        sale.quantity || 0
+      );
+
+      grouped[product].revenue += Number(
+        sale.total_amount || 0
+      );
+    });
+
+    return Object.entries(grouped)
+      .map(([name, value]) => ({
+        name,
+        quantity: value.quantity,
+        revenue: value.revenue,
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+  }, [sales]);
+
+  const topCustomers = useMemo(() => {
+    const grouped: Record<
+      string,
+      {
+        orders: number;
+        spent: number;
+      }
+    > = {};
+
+    sales.forEach((sale: any) => {
+      const customer =
+        sale.customer_name || "Walk-in";
+
+      if (!grouped[customer]) {
+        grouped[customer] = {
+          orders: 0,
+          spent: 0,
+        };
+      }
+
+      grouped[customer].orders++;
+
+      grouped[customer].spent += Number(
+        sale.total_amount || 0
+      );
+    });
+
+    return Object.entries(grouped)
+      .map(([name, value]) => ({
+        name,
+        orders: value.orders,
+        spent: value.spent,
+      }))
+      .sort((a, b) => b.spent - a.spent)
+      .slice(0, 5);
+  }, [sales]);
+
+  const businessGrowth = useMemo(() => {
+
+  const revenueGrowth =
+    totalRevenue > 0
+      ? Math.min(
+          100,
+          Math.round((totalRevenue / 1000000) * 10)
+        )
+      : 0;
+
+  const salesGrowth =
+    sales.length > 0
+      ? Math.min(100, sales.length * 2)
+      : 0;
+
+  const customerGrowth =
+    customers.length > 0
+      ? Math.min(100, customers.length * 3)
+      : 0;
+
+  const productionGrowth =
+    production.length > 0
+      ? Math.min(100, production.length * 2)
+      : 0;
+
+  const profitMargin =
+    totalRevenue > 0
+      ? Math.round(
+          (totalProfit / totalRevenue) * 100
+        )
+      : 0;
+
+  return {
+
+    revenueGrowth,
+
+    salesGrowth,
+
+    customerGrowth,
+
+    productionGrowth,
+
+    profitMargin,
+
+  };
+
+}, [
+  totalRevenue,
+  totalProfit,
+  sales,
+  customers,
+  production,
+]);
+
+const bestSellingProductName =
+  bestSellingProducts.length > 0
+    ? bestSellingProducts[0].name
+    : "No sales yet";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white text-xl">
+        Loading Analytics...
+      </div>
+    );
+  }
+    return (
+    <div className="min-h-screen bg-slate-950 p-6">
+
+      <ExecutiveHeader
+        period={period}
+        setPeriod={setPeriod}
+        onRefresh={fetchAnalytics}
+      />
+
+      <ExecutiveCards
+        totalRevenue={totalRevenue}
+        totalProfit={totalProfit}
+        totalExpenses={totalExpenses}
+        totalOrders={totalOrders}
+        totalCustomers={totalCustomers}
+        totalProducts={totalProducts}
+        totalProduction={totalProduction}
+        inventoryValue={inventoryValue}
+      />
+
+<div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
+
+  <BusinessGrowthIndex
+    revenueGrowth={businessGrowth.revenueGrowth}
+    salesGrowth={businessGrowth.salesGrowth}
+    customerGrowth={businessGrowth.customerGrowth}
+    productionGrowth={businessGrowth.productionGrowth}
+    profitMargin={businessGrowth.profitMargin}
+  />
+
+  <AIBusinessForecast
+    revenue={totalRevenue}
+    expenses={totalExpenses}
+    profit={totalProfit}
+    orders={totalOrders}
+    customers={totalCustomers}
+    lowStockItems={lowStockItems}
+    bestSellingProduct={bestSellingProductName}
+  />
+
+</div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
+
+        <RevenueChart
+          data={revenueChartData}
+        />
+
+        <ProductionChart
+          data={productionChartData}
+        />
 
       </div>
 
-    </ProtectedRoute>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
+
+        <SalesChart
+          data={salesChartData}
+        />
+
+<CustomerGrowthChart
+  data={customerPerformanceChartData}
+/>
+
+      </div>
+
+      <div className="mt-8">
+
+<InventoryChart
+  data={inventoryChartData}
+/>
+
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
+
+        <BestSellingProducts
+          products={bestSellingProducts}
+        />
+
+        <TopCustomers
+          customers={topCustomers}
+        />
+
+      </div>
+
+      <div className="mt-8">
+
+        <CustomerAnalytics
+          customers={customers}
+          orders={orders}
+        />
+
+      </div>
+
+      <div className="mt-8">
+
+        <CEOActionCenter
+          revenue={totalRevenue}
+          expenses={totalExpenses}
+          profit={totalProfit}
+          lowStockItems={lowStockItems}
+          totalCustomers={totalCustomers}
+          totalOrders={totalOrders}
+        />
+
+      </div>
+
+    </div>
   );
 }

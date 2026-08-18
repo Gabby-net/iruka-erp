@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -24,10 +25,6 @@ import {
   X,
 } from "lucide-react";
 
-const role =
-  typeof window !== "undefined"
-    ? localStorage.getItem("role")
-    : null;
 
 const menuByRole = {
   admin: [
@@ -41,11 +38,11 @@ const menuByRole = {
   href: "/orders",
   icon: ShoppingCart,
 },
-    {
-      name: "Sales",
-      href: "/sales",
-      icon: Wallet,
-    },
+{
+  name: "Customers",
+  href: "/customers",
+  icon: Users,
+},
     {
       name: "Production",
       href: "/production",
@@ -131,11 +128,6 @@ const menuByRole = {
   ],
 };
 
-const menu =
-  menuByRole[
-    role as keyof typeof menuByRole
-  ] || [];
-
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (
@@ -150,6 +142,15 @@ export default function Sidebar({
   const pathname = usePathname();
 
 const router = useRouter();
+const [role, setRole] = useState<string | null>(null);
+useEffect(() => {
+  setRole(localStorage.getItem("role"));
+}, []);
+
+const menu =
+  menuByRole[
+    role as keyof typeof menuByRole
+  ] || [];
 
 const handleLogout = async () => {
 
@@ -247,8 +248,8 @@ const handleLogout = async () => {
           </div>
 
           {/* Menu */}
-          <div className="px-4 space-y-2">
-            {menu.map((item) => {
+<div className="px-4 space-y-2">
+  {!role ? null : menu.map((item) => {
               const Icon = item.icon;
 
               const active =
@@ -274,7 +275,7 @@ const handleLogout = async () => {
                   </span>
                 </Link>
               );
-            })}
+              })}
           </div>
         </div>
 
