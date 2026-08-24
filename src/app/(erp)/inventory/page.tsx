@@ -397,10 +397,11 @@ console.log(transactions);
     <option value="Fruits Recipe">Fruits Recipe</option>
   </optgroup>
 
-  <optgroup label="📦 Packaging Materials">
-    <option value="Tape">Tape</option>
-    <option value="Twist">Twist</option>
-  </optgroup>
+ <optgroup label="📦 Packaging Materials">
+  <option value="Nylon">Nylon</option>
+  <option value="Tape">Tape</option>
+  <option value="Twist">Twist</option>
+</optgroup>
 
   <optgroup label="🧪 Bakery Additives">
     <option value="Brown">Brown</option>
