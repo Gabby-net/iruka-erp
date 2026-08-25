@@ -266,20 +266,221 @@ else if (reportPeriod === "year") {
         0
       );
 
-    // ===============================
-    // TOTAL PROFIT
-    // ===============================
+// ===============================
+// MATERIAL / PRODUCTION COST
+// ===============================
 
-    const profit =
-      revenue - expenseTotal;
+// Get inventory transactions
+const {
+  data: inventoryTransactions,
+  error: inventoryError,
+} = await supabase
+  .from("inventory_transactions")
+  .select("*")
+  .order("created_at", {
+    ascending: false,
+  });
 
-    setTotalRevenue(revenue);
+if (inventoryError) throw inventoryError;
 
-    setTotalExpenses(
-      expenseTotal
-    );
+const allInventoryTransactions =
+  inventoryTransactions || [];
 
-    setNetProfit(profit);
+
+// ===============================
+// GET INVENTORY ITEMS
+// ===============================
+
+// Unit cost is stored in the inventory table,
+// NOT in inventory_transactions.
+
+const {
+  data: inventoryItems,
+  error: inventoryError2,
+} = await supabase
+  .from("inventory")
+  .select("*");
+
+if (inventoryError2) throw inventoryError2;
+
+const allInventoryItems =
+  inventoryItems || [];
+
+
+// ===============================
+// FILTER MATERIAL TRANSACTIONS
+// ===============================
+
+const materialTransactions =
+  allInventoryTransactions.filter(
+    (transaction) => {
+
+      const transactionDate =
+        new Date(transaction.created_at);
+
+      // TODAY
+      if (reportPeriod === "day") {
+        return (
+          transactionDate.getDate() === now.getDate() &&
+          transactionDate.getMonth() === now.getMonth() &&
+          transactionDate.getFullYear() === now.getFullYear()
+        );
+      }
+
+      // THIS MONTH
+      if (reportPeriod === "month") {
+        return (
+          transactionDate.getMonth() === now.getMonth() &&
+          transactionDate.getFullYear() === now.getFullYear()
+        );
+      }
+
+      // THIS YEAR
+      if (reportPeriod === "year") {
+        return (
+          transactionDate.getFullYear() ===
+          now.getFullYear()
+        );
+      }
+
+      return true;
+    }
+  );
+
+
+// ===============================
+// CALCULATE REAL MATERIAL COST
+// ===============================
+
+const materialCost =
+  materialTransactions.reduce(
+    (sum, transaction) => {
+
+      // Only count material deductions
+      const type =
+        String(
+          transaction.transaction_type || ""
+        ).toUpperCase();
+
+      if (
+        type !== "ISSUED" &&
+        type !== "AUTO_DEDUCTION"
+      ) {
+        return sum;
+      }
+
+
+      // ===============================
+      // TRANSACTION QUANTITY
+      // ===============================
+
+      const quantity =
+        Math.abs(
+          Number(
+            transaction.quantity_used ??
+            transaction.quantity ??
+            0
+          )
+        );
+
+
+      // ===============================
+      // FIND INVENTORY ITEM
+      // ===============================
+
+      const inventoryItem =
+        allInventoryItems.find(
+          (item) => {
+
+            // Most likely relationship
+            if (
+              transaction.inventory_id &&
+              String(item.id) ===
+                String(transaction.inventory_id)
+            ) {
+              return true;
+            }
+
+            // Alternative relationship
+            if (
+              transaction.material_id &&
+              String(item.id) ===
+                String(transaction.material_id)
+            ) {
+              return true;
+            }
+
+            return false;
+          }
+        );
+
+
+      // ===============================
+      // UNIT COST FROM INVENTORY TABLE
+      // ===============================
+
+      const unitCost =
+        Number(
+          inventoryItem?.unit_cost ??
+          inventoryItem?.cost_per_unit ??
+          0
+        );
+
+
+      // ===============================
+      // MATERIAL COST
+      // ===============================
+
+      const transactionCost =
+        quantity * unitCost;
+
+
+      return sum + transactionCost;
+
+    },
+    0
+  );
+
+
+// ===============================
+// REAL NET PROFIT
+// ===============================
+//
+// Revenue
+// - Material / Production Cost
+// - Business Expenses
+// = Net Profit
+
+const profit =
+  revenue -
+  materialCost -
+  expenseTotal;
+
+
+// ===============================
+// UPDATE FINANCE
+// ===============================
+
+setTotalRevenue(revenue);
+
+setTotalExpenses(
+  expenseTotal + materialCost
+);
+
+setNetProfit(profit);
+
+
+// ===============================
+// UPDATE FINANCE
+// ===============================
+
+setTotalRevenue(revenue);
+
+setTotalExpenses(
+  expenseTotal
+);
+
+setNetProfit(profit);
 
     // ===============================
     // AVAILABLE CASH

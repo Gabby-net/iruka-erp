@@ -397,10 +397,60 @@ console.log(transactions);
     <option value="Fruits Recipe">Fruits Recipe</option>
   </optgroup>
 
- <optgroup label="📦 Packaging Materials">
-  <option value="Nylon">Nylon</option>
-  <option value="Tape">Tape</option>
-  <option value="Twist">Twist</option>
+<optgroup label="📦 Nylon Packaging">
+
+  <option value="Small Iruka Nylon">
+    Small Iruka Nylon
+  </option>
+
+  <option value="Small Rosy Nylon">
+    Small Rosy Nylon
+  </option>
+
+  <option value="Medium Iruka Nylon">
+    Medium Iruka Nylon
+  </option>
+
+  <option value="Medium Rosy Nylon">
+    Medium Rosy Nylon
+  </option>
+
+  <option value="Big Smart Nylon">
+    Big Smart Nylon
+  </option>
+
+  <option value="Classic Iruka Nylon">
+    Classic Iruka Nylon
+  </option>
+
+  <option value="Classic Fruits Nylon">
+    Classic Fruits Nylon
+  </option>
+
+  <option value="Jumbo Iruka Nylon">
+    Jumbo Iruka Nylon
+  </option>
+
+  <option value="Jumbo Fruits Nylon">
+    Jumbo Fruits Nylon
+  </option>
+
+  <option value="Big Brother Family Nylon">
+    Big Brother Family Nylon
+  </option>
+
+</optgroup>
+
+<optgroup label="📦 Other Packaging">
+
+  <option value="Tape">
+    Tape
+  </option>
+
+  <option value="Twist">
+    Twist
+  </option>
+
 </optgroup>
 
   <optgroup label="🧪 Bakery Additives">

@@ -114,136 +114,79 @@ console.log(productionData);
      SAVE PRODUCTION
   ========================== */
 
-  async function saveProduction() {
+async function saveProduction() {
+  if (saving) return;
 
-   if (saving) return;
+  if (!selectedProduct || !quantityProduced) {
+    alert("Fill all required fields.");
+    return;
+  }
 
-setSaving(true);
+  const batches = Number(doughBatches || 0);
+  const produced = Number(quantityProduced || 0);
+  const waste = Number(wasteQuantity || 0);
 
-    if (
-      !selectedProduct ||
-      !quantityProduced
-    ) {
+  if (produced <= 0) {
+    alert("Production quantity must be greater than 0.");
+    return;
+  }
 
-      alert(
-        "Fill all required fields"
-      );
+  if (batches <= 0) {
+    alert("Dough batches must be greater than 0.");
+    return;
+  }
 
-      return;
+  setSaving(true);
+
+  try {
+    /* =========================
+       SELECTED PRODUCT
+    ========================== */
+
+    const product = products.find(
+      (item) => item.name === selectedProduct
+    );
+
+    if (!product) {
+      throw new Error("Selected product was not found.");
     }
 
     /* =========================
-       SAVE PRODUCTION LOG
+       RECIPE MAPPING
     ========================== */
 
-/* =========================
-   RECIPE MAPPING
-========================== */
+    let recipeName = "";
 
-let recipeName = "";
+    if (
+      [
+        "Small Iruka",
+        "Medium Iruka",
+        "Classic Iruka",
+        "Jumbo Iruka",
+        "Big Smart",
+      ].includes(selectedProduct)
+    ) {
+      recipeName = "Iruka Recipe";
+    } else if (
+      [
+        "Small Rosy",
+        "Medium Rosy",
+        "Big Brother Family",
+      ].includes(selectedProduct)
+    ) {
+      recipeName = "White Recipe";
+    } else if (
+      [
+        "Classic Fruits",
+        "Jumbo Fruits",
+      ].includes(selectedProduct)
+    ) {
+      recipeName = "Fruits Recipe";
+    }
 
-if (
-  [
-    "Small Iruka",
-    "Medium Iruka",
-    "Classic Iruka",
-    "Jumbo Iruka",
-    "Big Smart",
-  ].includes(selectedProduct)
-) {
-
-  recipeName = "Iruka Recipe";
-
-}
-
-else if (
-  [
-    "Small Rosy",
-    "Medium Rosy",
-    "Big Brother Family",
-  ].includes(selectedProduct)
-) {
-
-  recipeName = "White Recipe";
-
-}
-
-else if (
-  [
-    "Classic Fruits",
-    "Jumbo Fruits",
-  ].includes(selectedProduct)
-) {
-
-  recipeName = "Fruits Recipe";
-
-}
-
-if (!recipeName) {
-  alert("Recipe mapping not found.");
-  setSaving(false);
-  return;
-}
-
-const { data, error } = await supabase
-  .from("production_logs")
-  .insert([
-    {
-      product_id: selectedProductData?.id || null,
-      bread: selectedProduct,
-      quantity: Number(quantityProduced),
-      waste_quantity: Number(wasteQuantity || 0),
-      dough_batches: Number(doughBatches || 0),
-      produced_by: "Production Staff",
-      batch: `IRK-${new Date()
-        .toISOString()
-        .slice(0, 10)
-        .replace(/-/g, "")}-${Math.floor(Math.random() * 900 + 100)}`,
-      shift,
-      team: "A",
-      status: "Completed",
-      production_date: new Date().toISOString().split("T")[0],
-    },
-  ])
-  .select();
-
-if (error) {
-  console.error("Production insert error:", error);
-  alert(error.message);
-  setSaving(false);
-  return;
-}
-
-console.log("Production inserted:", data);
-
-/* UPDATE FINISHED GOODS STOCK */
-
-if (selectedProductData) {
-
-  const currentStock =
-    Number(selectedProductData.stock || 0);
-
-  const produced =
-    Number(quantityProduced || 0);
-
-  const waste =
-    Number(wasteQuantity || 0);
-
-  const netProduction =
-    produced - waste;
-
-  await supabase
-    .from("products")
-    .update({
-      stock:
-        currentStock +
-        netProduction,
-    })
-    .eq(
-      "id",
-      selectedProductData.id
-    );
-}
+    if (!recipeName) {
+      throw new Error("Recipe mapping not found.");
+    }
 
     /* =========================
        GET INVENTORY
@@ -251,411 +194,980 @@ if (selectedProductData) {
 
     const {
       data: inventory,
+      error: inventoryError,
     } = await supabase
-
       .from("inventory")
-
       .select("*");
+
+    if (inventoryError) {
+      throw new Error(inventoryError.message);
+    }
 
     /* =========================
        FIND MATERIALS
     ========================== */
 
-const flour =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Flour"
-  );
+    const flour = inventory?.find(
+      (item) => item.name === "Flour"
+    );
 
-const sugar =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Sugar"
-  );
+    const sugar = inventory?.find(
+      (item) => item.name === "Sugar"
+    );
 
-const butter =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Butter"
-  );
+    const butter = inventory?.find(
+      (item) => item.name === "Butter"
+    );
 
-const yeast =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Yeast"
-  );
+    const yeast = inventory?.find(
+      (item) => item.name === "Yeast"
+    );
 
-const resins =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Resins"
-  );
+    const groundnutOil = inventory?.find(
+      (item) => item.name === "Groundnut Oil"
+    );
 
-const brown =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Brown"
-  );
+    const resins = inventory?.find(
+      (item) => item.name === "Resins"
+    );
 
-const groundnutOil =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Groundnut Oil"
-  );
+    const recipeInventory = inventory?.find(
+      (item) => item.name === recipeName
+    );
 
-  const recipeInventory =
-  inventory?.find(
-    (item) =>
-      item.name === recipeName
-  );
+    const brown = inventory?.find(
+  (item) => item.name === "Brown"
+);
 
-const tape =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Tape"
-  );
+const flavour = inventory?.find(
+  (item) => item.name === "Flavour"
+);
 
-const twist =
-  inventory?.find(
-    (item) =>
-      item.name ===
-      "Twist"
-  );
+const tape = inventory?.find(
+  (item) => item.name === "Tape"
+);
 
-    /* =========================
-       PRODUCT OUTPUT RATIOS
-    ========================== */
-
-
-    /* =========================
-   MATERIAL USAGE
-========================== */
-
-const batches =
-Number(doughBatches);
+const twist = inventory?.find(
+  (item) => item.name === "Twist"
+);
 
 /* =========================
-   INVENTORY VALIDATION
+   PRODUCT-SPECIFIC NYLON
 ========================== */
+
+const nylonNameMap: Record<string, string> = {
+
+  "Small Iruka":
+    "Small Iruka Nylon",
+
+  "Small Rosy":
+    "Small Rosy Nylon",
+
+  "Medium Iruka":
+    "Medium Iruka Nylon",
+
+  "Medium Rosy":
+    "Medium Rosy Nylon",
+
+  "Big Smart":
+    "Big Smart Nylon",
+
+  "Classic Iruka":
+    "Classic Iruka Nylon",
+
+  "Classic Fruits":
+    "Classic Fruits Nylon",
+
+  "Jumbo Iruka":
+    "Jumbo Iruka Nylon",
+
+  "Jumbo Fruits":
+    "Jumbo Fruits Nylon",
+
+  "Big Brother Family":
+    "Big Brother Family Nylon",
+
+};
+
+const nylonName =
+  nylonNameMap[selectedProduct];
+
+const nylon =
+  inventory?.find(
+    (item) =>
+      item.name === nylonName
+  );
+
+/* =========================
+   AUTOMATIC MATERIAL CALCULATIONS
+   BASED ON DOUGH BATCHES
+========================== */
+
+/* CORE PRODUCTION MATERIALS */
 
 const flourNeeded = batches * 2;
 
-const sugarNeeded = (batches * 12) / 50;
+const sugarNeeded =
+  (batches * 12) / 50;
 
-const butterNeeded = (batches * 1.35) / 15;
+const butterNeeded =
+  (batches * 1.35) / 15;
 
 const yeastNeeded = batches;
 
-const groundnutOilNeeded = (batches * 0.23) / 23;
+const groundnutOilNeeded =
+  (batches * 0.23) / 23;
+
+
+/* =========================
+   RECIPE PACK
+========================== */
 
 const recipeNeeded = batches;
 
-const resinNeeded =
-  selectedProduct === "Small Rosy" ||
-  selectedProduct === "Big Brother Family"
-    ? batches / 10
+
+/* =========================
+   BROWN
+   0.5 L per dough batch
+   ONLY:
+   Small Iruka
+   Big Smart
+   Medium Iruka
+   Classic Iruka
+   Jumbo Iruka
+========================== */
+
+const brownNeeded =
+  [
+    "Small Iruka",
+    "Big Smart",
+    "Medium Iruka",
+    "Classic Iruka",
+    "Jumbo Iruka",
+  ].includes(selectedProduct)
+    ? batches * 0.5
     : 0;
 
-if (Number(flour?.quantity || 0) < flourNeeded) {
-  alert("Not enough Flour.");
-  return;
-}
-
-if (Number(sugar?.quantity || 0) < sugarNeeded) {
-  alert("Not enough Sugar.");
-  return;
-}
-
-if (Number(butter?.quantity || 0) < butterNeeded) {
-  alert("Not enough Butter.");
-  return;
-}
-
-if (Number(yeast?.quantity || 0) < yeastNeeded) {
-  alert("Not enough Yeast.");
-  return;
-}
-
-if (Number(groundnutOil?.quantity || 0) < groundnutOilNeeded) {
-  alert("Not enough Groundnut Oil.");
-  return;
-}
-
-if (
-  Number(recipeInventory?.quantity || 0) < recipeNeeded
-) {
-  alert(`Not enough ${recipeName}.`);
-  return;
-}
-
-if (
-  resinNeeded > 0 &&
-  Number(resins?.quantity || 0) < resinNeeded
-) {
-  alert("Not enough Resins.");
-  return;
-}
 
 /* =========================
-   MATERIAL DEDUCTIONS
+   FLAVOUR
+   0.25 KG per dough batch
+   ALL PRODUCTS
 ========================== */
 
-const flourUsed = flourNeeded;
+const flavourNeeded =
+  batches * 0.25;
 
-const sugarUsed = sugarNeeded;
-
-const butterUsed = butterNeeded;
-
-const yeastUsed = yeastNeeded;
-
-const groundnutOilUsed = groundnutOilNeeded;
-
-const recipeUsed = recipeNeeded;
-
-const resinUsed = resinNeeded;
-
-    /* =========================
-       UPDATE INVENTORY
-    ========================== */
-
-    if (flour) {
-
-      await supabase
-
-        .from("inventory")
-
-        .update({
-          quantity:
-            Number(
-              flour.quantity
-            ) - flourUsed,
-        })
-
-        .eq(
-          "id",
-          flour.id
-        );
-    }
-
-    if (sugar) {
-
-      await supabase
-
-        .from("inventory")
-
-        .update({
-          quantity:
-            Number(
-              sugar.quantity
-            ) - sugarUsed,
-        })
-
-        .eq(
-          "id",
-          sugar.id
-        );
-    }
-
-    if (butter) {
-
-      await supabase
-
-        .from("inventory")
-
-        .update({
-          quantity:
-            Number(
-              butter.quantity
-            ) - butterUsed,
-        })
-
-        .eq(
-          "id",
-          butter.id
-        );
-    }
-
-    if (yeast) {
-
-      await supabase
-
-        .from("inventory")
-
-        .update({
-          quantity:
-            Number(
-              yeast.quantity
-            ) - yeastUsed,
-        })
-
-        .eq(
-          "id",
-          yeast.id
-        );
-    }
-
-    if (groundnutOil) {
-
-  await supabase
-    .from("inventory")
-    .update({
-      quantity:
-        Number(groundnutOil.quantity) -
-        groundnutOilUsed,
-    })
-    .eq("id", groundnutOil.id);
-
-}
 
 /* =========================
-   DEDUCT RECIPE PACKS
+   TAPE
+   0.8181 per dough batch
+   ONLY:
+   Small Iruka
+   Small Rosy
 ========================== */
 
-if (recipeInventory) {
+const tapeNeeded =
+  [
+    "Small Iruka",
+    "Small Rosy",
+  ].includes(selectedProduct)
+    ? batches * 0.8181
+    : 0;
 
-  await supabase
-    .from("inventory")
-    .update({
-      quantity:
-        Number(recipeInventory.quantity) -
-        recipeUsed,
-    })
-    .eq("id", recipeInventory.id);
-
-}
 
 /* =========================
-   DEDUCT RESINS
+   TWIST
+   1 STRIP PER PIECE
+   Inventory stores 600 strips per pack
+
+   Therefore:
+   pieces / 600 = packs used
 ========================== */
 
-if (resins && resinUsed > 0) {
+const twistNeeded =
+  [
+    "Big Smart",
+    "Medium Rosy",
+    "Medium Iruka",
+    "Jumbo Fruits",
+    "Jumbo Iruka",
+    "Classic Fruits",
+    "Classic Iruka",
+    "Big Brother Family",
+  ].includes(selectedProduct)
+    ? produced / 600
+    : 0;
 
-  await supabase
-    .from("inventory")
-    .update({
-      quantity:
-        Number(resins.quantity) -
-        resinUsed,
-    })
-    .eq("id", resins.id);
-
-}
 
 /* =========================
-   INVENTORY HISTORY
+   NYLON
+   1 nylon per piece
+   ALL 10 PRODUCTS
 ========================== */
 
-const transactions = [
+const nylonNeeded =
+  produced;
+
+
+/* =========================
+   RESINS
+   1 KG per dough batch
+   ONLY:
+   Big Brother Family
+   Small Rosy
+   Jumbo Fruits
+========================== */
+
+const resinNeeded =
+  [
+    "Big Brother Family",
+    "Small Rosy",
+    "Jumbo Fruits",
+  ].includes(selectedProduct)
+    ? batches
+    : 0;
+
+ /* =========================
+   INVENTORY VALIDATION
+========================== */
+
+const requiredMaterials = [
+
   {
-    material_name: "Flour",
-    quantity_used: flourUsed,
+    item: flour,
+    name: "Flour",
+    amount: flourNeeded,
   },
+
   {
-    material_name: "Sugar",
-    quantity_used: sugarUsed,
+    item: sugar,
+    name: "Sugar",
+    amount: sugarNeeded,
   },
+
   {
-    material_name: "Butter",
-    quantity_used: butterUsed,
+    item: butter,
+    name: "Butter",
+    amount: butterNeeded,
   },
+
   {
-    material_name: "Yeast",
-    quantity_used: yeastUsed,
+    item: yeast,
+    name: "Yeast",
+    amount: yeastNeeded,
   },
+
   {
-    material_name: "Groundnut Oil",
-    quantity_used: groundnutOilUsed,
+    item: groundnutOil,
+    name: "Groundnut Oil",
+    amount: groundnutOilNeeded,
   },
+
   {
-    material_name: recipeName,
-    quantity_used: recipeUsed,
+    item: recipeInventory,
+    name: recipeName,
+    amount: recipeNeeded,
   },
+
+  {
+    item: flavour,
+    name: "Flavour",
+    amount: flavourNeeded,
+  },
+
+  /* PRODUCT-SPECIFIC NYLON */
+
+  {
+    item: nylon,
+    name: nylonName,
+    amount: nylonNeeded,
+  },
+
 ];
 
-if (resinUsed > 0) {
-  transactions.push({
-    material_name: "Resins",
-    quantity_used: resinUsed,
-  });
-}
-
-await supabase
-  .from("inventory_transactions")
-  .insert(
-    transactions.map((item) => ({
-      material_name: item.material_name,
-      quantity_used: item.quantity_used,
-      transaction_type: "AUTO_DEDUCTION",
-      reference: `${selectedProduct} Production`,
-      created_at: new Date().toISOString(),
-    }))
-  );
 
 /* =========================
-   REFRESH & RESET
+   CHECK MATERIALS EXIST
 ========================== */
 
-await fetchData();
+for (const material of requiredMaterials) {
 
-console.log("After upload:", productionLogs);
+  if (!material.item) {
+    throw new Error(
+      `${material.name} inventory item not found.`
+    );
+  }
 
-setSelectedProduct("");
-setQuantityProduced("");
-setWasteQuantity("");
-setDoughBatches("");
-setShift("Morning");
+}
 
-setSaving(false);
 
-alert("successfully!");
+/* =========================
+   CHECK ENOUGH STOCK
+========================== */
 
-await supabase
+for (const material of requiredMaterials) {
+
+  const available =
+    Number(material.item.quantity || 0);
+
+  if (available < material.amount) {
+
+    throw new Error(
+      `Not enough ${material.name}. Required: ${material.amount}, Available: ${available}`
+    );
+
+  }
+
+}
+
+
+/* =========================
+   CREATE BATCH NUMBER
+========================== */
+
+const batchNumber =
+  `IRK-${new Date()
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, "")}-${Math.floor(
+    Math.random() * 900 + 100
+  )}`;
+
+
+/* =========================
+   1. INSERT PRODUCTION LOG
+========================== */
+
+const {
+  data: productionData,
+  error: productionError,
+} = await supabase
+  .from("production_logs")
+  .insert([
+    {
+      product_id: product.id,
+      bread: selectedProduct,
+      quantity: produced,
+      waste_quantity: waste,
+      dough_batches: batches,
+      produced_by: "Production Staff",
+      batch: batchNumber,
+      shift: shift,
+      team: "A",
+      status: "Completed",
+      production_date:
+        new Date()
+          .toISOString()
+          .split("T")[0],
+    },
+  ])
+  .select()
+  .single();
+
+if (productionError) {
+
+  throw new Error(
+    `Production save failed: ${productionError.message}`
+  );
+
+}
+
+console.log(
+  "Production created:",
+  productionData
+);
+
+
+/* =========================
+   2. UPDATE FINISHED GOODS
+========================== */
+
+const netProduction =
+  produced - waste;
+
+const {
+  error: productError,
+} = await supabase
+  .from("products")
+  .update({
+    stock:
+      Number(product.stock || 0) +
+      netProduction,
+  })
+  .eq("id", product.id);
+
+if (productError) {
+
+  throw new Error(
+    `Product stock update failed: ${productError.message}`
+  );
+
+}
+
+
+/* =========================
+   3. AUTOMATICALLY DEDUCT
+      ALL PRODUCTION MATERIALS
+========================== */
+
+for (const material of requiredMaterials) {
+
+  const newQuantity =
+    Number(material.item.quantity || 0) -
+    material.amount;
+
+  const {
+    error: deductionError,
+  } = await supabase
+    .from("inventory")
+    .update({
+      quantity: newQuantity,
+    })
+    .eq("id", material.item.id);
+
+  if (deductionError) {
+
+    throw new Error(
+      `Failed to deduct ${material.name}: ${deductionError.message}`
+    );
+
+  }
+
+}
+
+
+/* =========================
+   4. INVENTORY HISTORY
+========================== */
+
+const inventoryTransactions =
+  requiredMaterials.map((material) => ({
+
+    material_name:
+      material.name,
+
+    quantity_used:
+      material.amount,
+
+    transaction_type:
+      "AUTO_DEDUCTION",
+
+    reference:
+      `${selectedProduct} Production - ${batchNumber}`,
+
+    created_at:
+      new Date().toISOString(),
+
+  }));
+
+const {
+  error: transactionError,
+} = await supabase
   .from("inventory_transactions")
   .insert(
-    transactions.map((item) => ({
-      material_name: item.material_name,
-      quantity_used: item.quantity_used,
-      transaction_type: "AUTO_DEDUCTION",
-      reference: `${selectedProduct} Production`,
-      created_at: new Date().toISOString(),
-    }))
+    inventoryTransactions
   );
-console.log("After upload:", productionLogs);
 
-setSelectedProduct("");
-setQuantityProduced("");
-setWasteQuantity("");
-setDoughBatches("");
-setShift("Morning");
+if (transactionError) {
 
-alert("Production uploaded successfully!");
-setSaving(false);
+  throw new Error(
+    `Inventory history failed: ${transactionError.message}`
+  );
+
+}
+
     /* =========================
-       RESET
+       5. REFRESH DATA
+    ========================== */
+
+    await fetchData();
+
+    /* =========================
+       6. RESET FORM
     ========================== */
 
     setSelectedProduct("");
-
     setQuantityProduced("");
-
     setWasteQuantity("");
-
+    setDoughBatches("");
     setShift("Morning");
 
-    fetchData();
+    alert(
+      "Production uploaded successfully! Inventory has been deducted."
+    );
+
+  } catch (error: any) {
+
+    console.error(
+      "Production upload error:",
+      error
+    );
 
     alert(
-      "Production uploaded & inventory deducted successfully"
+      error?.message ||
+      "Failed to upload production."
+    );
+
+  } finally {
+
+    setSaving(false);
+
+  }
+}
+
+async function deleteProduction(log: any) {
+  const confirmed = window.confirm(
+    `DELETE PRODUCTION?\n\n` +
+    `Product: ${log.bread}\n` +
+    `Produced: ${Number(log.quantity || 0).toLocaleString()}\n` +
+    `Waste: ${Number(log.waste_quantity || 0).toLocaleString()}\n` +
+    `Dough Batches: ${Number(log.dough_batches || 0).toLocaleString()}\n\n` +
+    `This will:\n` +
+    `• Remove the production record\n` +
+    `• Reverse finished product stock\n` +
+    `• Restore ALL materials used\n` +
+    `• Remove its inventory history\n\n` +
+    `This action cannot be undone.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    /* =========================
+       BASIC VALUES
+    ========================== */
+
+    const batches = Number(log.dough_batches || 0);
+    const produced = Number(log.quantity || 0);
+    const waste = Number(log.waste_quantity || 0);
+
+    const netProduction = produced - waste;
+
+    if (batches <= 0) {
+      throw new Error("Invalid dough batch value.");
+    }
+
+    if (produced <= 0) {
+      throw new Error("Invalid production quantity.");
+    }
+
+    /* =========================
+       FIND PRODUCT
+    ========================== */
+
+    const {
+      data: product,
+      error: productError,
+    } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", log.product_id)
+      .single();
+
+    if (productError || !product) {
+      throw new Error("Finished product not found.");
+    }
+
+    /* =========================
+       RECIPE MAPPING
+    ========================== */
+
+    let recipeName = "";
+
+    if (
+      [
+        "Small Iruka",
+        "Medium Iruka",
+        "Classic Iruka",
+        "Jumbo Iruka",
+        "Big Smart",
+      ].includes(log.bread)
+    ) {
+      recipeName = "Iruka Recipe";
+    } else if (
+      [
+        "Small Rosy",
+        "Medium Rosy",
+        "Big Brother Family",
+      ].includes(log.bread)
+    ) {
+      recipeName = "White Recipe";
+    } else if (
+      [
+        "Classic Fruits",
+        "Jumbo Fruits",
+      ].includes(log.bread)
+    ) {
+      recipeName = "Fruits Recipe";
+    }
+
+    if (!recipeName) {
+      throw new Error(
+        `Recipe mapping not found for ${log.bread}.`
+      );
+    }
+
+    /* =========================
+       MATERIAL CALCULATIONS
+       MUST EXACTLY MATCH SAVE
+    ========================== */
+
+    const flourUsed =
+      batches * 2;
+
+    const sugarUsed =
+      (batches * 12) / 50;
+
+    const butterUsed =
+      (batches * 1.35) / 15;
+
+    const yeastUsed =
+      batches;
+
+    const groundnutOilUsed =
+      (batches * 0.23) / 23;
+
+    const recipeUsed =
+      batches;
+
+    const brownUsed =
+      [
+        "Small Iruka",
+        "Big Smart",
+        "Medium Iruka",
+        "Classic Iruka",
+        "Jumbo Iruka",
+      ].includes(log.bread)
+        ? batches * 0.5
+        : 0;
+
+    const flavourUsed =
+      batches * 0.25;
+
+    const tapeUsed =
+      [
+        "Small Iruka",
+        "Small Rosy",
+      ].includes(log.bread)
+        ? batches * 0.8181
+        : 0;
+
+    const twistUsed =
+      [
+        "Big Smart",
+        "Medium Rosy",
+        "Medium Iruka",
+        "Jumbo Fruits",
+        "Jumbo Iruka",
+        "Classic Fruits",
+        "Classic Iruka",
+        "Big Brother Family",
+      ].includes(log.bread)
+        ? produced / 600
+        : 0;
+
+    const nylonUsed =
+      produced;
+
+      const nylonNameMap: Record<string, string> = {
+
+  "Small Iruka":
+    "Small Iruka Nylon",
+
+  "Small Rosy":
+    "Small Rosy Nylon",
+
+  "Medium Iruka":
+    "Medium Iruka Nylon",
+
+  "Medium Rosy":
+    "Medium Rosy Nylon",
+
+  "Big Smart":
+    "Big Smart Nylon",
+
+  "Classic Iruka":
+    "Classic Iruka Nylon",
+
+  "Classic Fruits":
+    "Classic Fruits Nylon",
+
+  "Jumbo Iruka":
+    "Jumbo Iruka Nylon",
+
+  "Jumbo Fruits":
+    "Jumbo Fruits Nylon",
+
+  "Big Brother Family":
+    "Big Brother Family Nylon",
+
+};
+
+const nylonName =
+  nylonNameMap[log.bread];
+
+if (!nylonName) {
+  throw new Error(
+    `Nylon mapping not found for ${log.bread}.`
+  );
+}
+
+    const resinUsed =
+      [
+        "Big Brother Family",
+        "Small Rosy",
+        "Jumbo Fruits",
+      ].includes(log.bread)
+        ? batches
+        : 0;
+
+    /* =========================
+       GET INVENTORY
+    ========================== */
+
+    const {
+      data: inventory,
+      error: inventoryError,
+    } = await supabase
+      .from("inventory")
+      .select("*");
+
+    if (inventoryError) {
+      throw new Error(
+        `Failed to load inventory: ${inventoryError.message}`
+      );
+    }
+
+    /* =========================
+       BUILD RESTORATION LIST
+    ========================== */
+
+    const materialsToRestore = [
+      {
+        name: "Flour",
+        amount: flourUsed,
+      },
+      {
+        name: "Sugar",
+        amount: sugarUsed,
+      },
+      {
+        name: "Butter",
+        amount: butterUsed,
+      },
+      {
+        name: "Yeast",
+        amount: yeastUsed,
+      },
+      {
+        name: "Groundnut Oil",
+        amount: groundnutOilUsed,
+      },
+      {
+        name: recipeName,
+        amount: recipeUsed,
+      },
+      {
+        name: "Flavour",
+        amount: flavourUsed,
+      },
+  {
+  name: nylonName,
+  amount: nylonUsed,
+},
+    ];
+
+    if (brownUsed > 0) {
+      materialsToRestore.push({
+        name: "Brown",
+        amount: brownUsed,
+      });
+    }
+
+    if (tapeUsed > 0) {
+      materialsToRestore.push({
+        name: "Tape",
+        amount: tapeUsed,
+      });
+    }
+
+    if (twistUsed > 0) {
+      materialsToRestore.push({
+        name: "Twist",
+        amount: twistUsed,
+      });
+    }
+
+    if (resinUsed > 0) {
+      materialsToRestore.push({
+        name: "Resins",
+        amount: resinUsed,
+      });
+    }
+
+    /* =========================
+       VERIFY ALL INVENTORY ITEMS
+       BEFORE CHANGING ANYTHING
+    ========================== */
+
+    for (const material of materialsToRestore) {
+      const item = inventory?.find(
+        (i) => i.name === material.name
+      );
+
+      if (!item) {
+        throw new Error(
+          `${material.name} inventory item not found.`
+        );
+      }
+    }
+
+    /* =========================
+       CHECK FINISHED STOCK
+    ========================== */
+
+    const currentProductStock =
+      Number(product.stock || 0);
+
+    if (
+      currentProductStock <
+      netProduction
+    ) {
+      throw new Error(
+        `Cannot delete this production.\n\n` +
+        `Current ${log.bread} stock: ${currentProductStock.toLocaleString()}\n` +
+        `Stock produced by this record: ${netProduction.toLocaleString()}\n\n` +
+        `The finished product has already been used.`
+      );
+    }
+
+    /* =========================
+       RESTORE INVENTORY
+    ========================== */
+
+    for (const material of materialsToRestore) {
+      const item = inventory?.find(
+        (i) => i.name === material.name
+      );
+
+      if (!item) {
+        throw new Error(
+          `${material.name} inventory item not found.`
+        );
+      }
+
+      const newQuantity =
+        Number(item.quantity || 0) +
+        material.amount;
+
+      const {
+        error,
+      } = await supabase
+        .from("inventory")
+        .update({
+          quantity: newQuantity,
+        })
+        .eq("id", item.id);
+
+      if (error) {
+        throw new Error(
+          `Failed to restore ${material.name}: ${error.message}`
+        );
+      }
+    }
+
+    /* =========================
+       REVERSE FINISHED PRODUCT
+    ========================== */
+
+    const newProductStock =
+      currentProductStock -
+      netProduction;
+
+    const {
+      error: stockError,
+    } = await supabase
+      .from("products")
+      .update({
+        stock: newProductStock,
+      })
+      .eq("id", product.id);
+
+    if (stockError) {
+      throw new Error(
+        `Failed to reverse ${log.bread} stock: ${stockError.message}`
+      );
+    }
+
+    /* =========================
+       DELETE PRODUCTION LOG
+    ========================== */
+
+    const {
+      error: deleteError,
+    } = await supabase
+      .from("production_logs")
+      .delete()
+      .eq("id", log.id);
+
+    if (deleteError) {
+      throw new Error(
+        `Failed to delete production record: ${deleteError.message}`
+      );
+    }
+
+    /* =========================
+       DELETE ONLY THIS RECORD'S
+       INVENTORY HISTORY
+    ========================== */
+
+    const {
+      error: historyError,
+    } = await supabase
+      .from("inventory_transactions")
+      .delete()
+      .eq(
+        "reference",
+        `${log.bread} Production - ${log.batch}`
+      );
+
+    if (historyError) {
+      console.error(
+        "Inventory history cleanup error:",
+        historyError
+      );
+    }
+
+    /* =========================
+       REFRESH EVERYTHING
+    ========================== */
+
+    await fetchData();
+
+    /* =========================
+       SUCCESS
+    ========================== */
+
+    alert(
+      `Production deleted successfully.\n\n` +
+      `${log.bread}: ${netProduction.toLocaleString()} pieces removed from finished stock.\n` +
+      `All production materials have been restored.`
+    );
+
+  } catch (error: any) {
+
+    console.error(
+      "Delete production error:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Failed to delete production."
     );
   }
+}
 
   /* =========================
      TOTALS
@@ -981,11 +1493,12 @@ const displayedHistory =
 
     <div className="p-8">
 
-      <RecipePreview
-        selectedProduct={selectedProduct}
-        doughBatches={doughBatches}
-        recipeName={selectedRecipeName}
-      />
+<RecipePreview
+  selectedProduct={selectedProduct}
+  doughBatches={doughBatches}
+  quantityProduced={quantityProduced}
+  recipeName={selectedRecipeName}
+/>
 
     </div>
 
@@ -1047,9 +1560,17 @@ const displayedHistory =
 
           <th className="px-6 py-4 text-center text-slate-300">Net</th>
 
-          <th className="px-6 py-4 text-center text-slate-300">Status</th>
+<th className="px-6 py-4 text-center text-slate-300">
+  Status
+</th>
 
-          <th className="px-6 py-4 text-center text-slate-300">Date</th>
+<th className="px-6 py-4 text-center text-slate-300">
+  Date
+</th>
+
+<th className="px-6 py-4 text-center text-slate-300">
+  Action
+</th>
 
         </tr>
 
@@ -1062,7 +1583,7 @@ const displayedHistory =
           <tr>
 
             <td
-              colSpan={8}
+              colSpan={9}
               className="text-center py-16 text-slate-400"
             >
 
@@ -1162,6 +1683,17 @@ const displayedHistory =
                 ).toLocaleString()}
 
               </td>
+
+              <td className="px-6 py-5 text-center">
+
+  <button
+    onClick={() => deleteProduction(log)}
+    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-bold transition"
+  >
+    Delete
+  </button>
+
+</td>
 
             </tr>
 
