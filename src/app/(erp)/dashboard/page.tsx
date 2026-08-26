@@ -75,14 +75,12 @@ const [showOrderModal, setShowOrderModal] = useState(false);
     try {
 
 const [
-
   salesRes,
   productRes,
   inventoryRes,
   expenseRes,
-  debtorRes,
   ordersRes,
-
+  debtorRes,
 ] = await Promise.all([
 
         supabase
@@ -113,17 +111,17 @@ const [
 
       ]);
 
-      setSales(salesRes.data || []);
+setSales(salesRes.data || []);
 
-      setProducts(productRes.data || []);
+setProducts(productRes.data || []);
 
-      setInventory(inventoryRes.data || []);
+setInventory(inventoryRes.data || []);
 
-      setExpenses(expenseRes.data || []);
+setExpenses(expenseRes.data || []);
 
-      setDebtors(debtorRes.data || []);
+setRecentOrders(ordersRes.data || []);
 
-      setRecentOrders(ordersRes.data || []);
+setDebtors(debtorRes.data || []);
 
     } catch (error) {
 

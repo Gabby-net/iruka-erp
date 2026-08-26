@@ -214,6 +214,191 @@ async function saveOrder() {
   fetchOrders();
 }
 
+async function updateOrderPayment(
+  order: any,
+  newStatus: string
+) {
+  const totalAmount = Number(
+    order.total_amount || 0
+  );
+
+  let amountPaid = Number(
+    order.amount_paid || 0
+  );
+
+  // PARTIALLY PAID
+  if (newStatus === "Partially Paid") {
+
+    const input = prompt(
+      `Enter amount paid by ${order.customer_name}:`
+    );
+
+    if (input === null) {
+      return;
+    }
+
+    amountPaid = Number(input);
+
+    if (
+      isNaN(amountPaid) ||
+      amountPaid <= 0
+    ) {
+      alert("Enter a valid payment amount.");
+      return;
+    }
+
+    if (amountPaid >= totalAmount) {
+      alert(
+        "Payment cannot be equal to or greater than the order total. Select Paid instead."
+      );
+      return;
+    }
+  }
+
+  // PAID
+  if (newStatus === "Paid") {
+    amountPaid = totalAmount;
+  }
+
+  // PENDING / REFUNDED
+  if (
+    newStatus === "Pending" ||
+    newStatus === "Refunded"
+  ) {
+    amountPaid = 0;
+  }
+
+  // CALCULATE REMAINING BALANCE
+  const balance = Math.max(
+    totalAmount - amountPaid,
+    0
+  );
+
+  // UPDATE ORDER
+  const { error: orderError } =
+    await supabase
+      .from("orders")
+      .update({
+        payment_status: newStatus,
+        amount_paid: amountPaid,
+      })
+      .eq("id", order.id);
+
+  if (orderError) {
+    alert(orderError.message);
+    return;
+  }
+
+  // FIND CUSTOMER IN DEBTORS
+  const {
+    data: existingDebtor,
+    error: debtorError,
+  } = await supabase
+    .from("debtors")
+    .select("*")
+    .eq("phone", order.phone)
+    .maybeSingle();
+
+  if (debtorError) {
+    console.error(
+      "Debtor lookup error:",
+      debtorError
+    );
+  }
+
+  // CUSTOMER OWES MONEY
+  if (
+    newStatus === "Partially Paid" &&
+    balance > 0
+  ) {
+
+    // CUSTOMER ALREADY EXISTS
+    if (existingDebtor) {
+
+      const { error } =
+        await supabase
+          .from("debtors")
+          .update({
+            customer_name:
+              order.customer_name,
+            phone:
+              order.phone,
+            balance:
+              balance,
+            status:
+              "Owing",
+          })
+          .eq(
+            "id",
+            existingDebtor.id
+          );
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+    }
+
+    // NEW CUSTOMER
+    else {
+
+      const { error } =
+        await supabase
+          .from("debtors")
+          .insert({
+            customer_name:
+              order.customer_name,
+            phone:
+              order.phone,
+            location:
+              "",
+            credit_limit:
+              0,
+            balance:
+              balance,
+            status:
+              "Owing",
+          });
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+    }
+  }
+
+  // CUSTOMER PAID EVERYTHING
+  if (newStatus === "Paid") {
+
+    if (existingDebtor) {
+
+      const { error } =
+        await supabase
+          .from("debtors")
+          .update({
+            balance: 0,
+            status: "Paid",
+          })
+          .eq(
+            "id",
+            existingDebtor.id
+          );
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+    }
+  }
+
+  await fetchOrders();
+
+  alert(
+    `Payment updated successfully.\n\nAmount Paid: ₦${amountPaid.toLocaleString()}\nBalance: ₦${balance.toLocaleString()}`
+  );
+}
+
 async function completeCustomerOrder(order: any) {
 
   if (order.order_status === "Completed") {
@@ -966,47 +1151,38 @@ className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
 >
   {order.payment_status}
 </div>
-  <select
-    value={
-      order.payment_status || "Pending"
-    }
+<select
+  value={
+    order.payment_status || "Pending"
+  }
 
-    onChange={async (e) => {
+  onChange={(e) =>
+    updateOrderPayment(
+      order,
+      e.target.value
+    )
+  }
 
-      await supabase
-        .from("orders")
-        .update({
-          payment_status:
-            e.target.value,
-        })
-        .eq(
-          "id",
-          order.id
-        );
+  className="w-full rounded-xl border border-slate-700 bg-slate-800 text-white px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
+>
 
-      fetchOrders();
-    }}
+  <option value="Pending">
+    Pending
+  </option>
 
-    className="w-full rounded-xl border border-slate-700 bg-slate-800 text-white px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
-  >
+  <option value="Partially Paid">
+    Partially Paid
+  </option>
 
-    <option>
-      Pending
-    </option>
+  <option value="Paid">
+    Paid
+  </option>
 
-    <option>
-      Partially Paid
-    </option>
+  <option value="Refunded">
+    Refunded
+  </option>
 
-    <option>
-      Paid
-    </option>
-
-    <option>
-      Refunded
-    </option>
-
-  </select>
+</select>
 
 </td>
 
@@ -1126,16 +1302,22 @@ onChange={async (e) => {
 
 <td className="p-4 text-slate-200">
 
-  <button
-    onClick={async () => {
+<button
+  onClick={async () => {
 
-      if (
-        !confirm(
-          "Delete this order?"
-        )
+    if (
+      !confirm(
+        "Delete this order?\n\nThis will also update the customer's outstanding debt."
       )
-        return;
+    ) {
+      return;
+    }
 
+    // =====================================
+    // DELETE ORDER
+    // =====================================
+
+    const { error: deleteError } =
       await supabase
         .from("orders")
         .delete()
@@ -1144,15 +1326,144 @@ onChange={async (e) => {
           order.id
         );
 
-      fetchOrders();
-    }}
+    if (deleteError) {
+      alert(deleteError.message);
+      return;
+    }
 
-    className="bg-red-600 text-white px-4 py-2 rounded-lg"
-  >
+    // =====================================
+    // FIND CUSTOMER'S OTHER OUTSTANDING ORDERS
+    // =====================================
 
-    Delete
+    const {
+      data: remainingOrders,
+      error: remainingOrdersError,
+    } = await supabase
+      .from("orders")
+      .select(
+        "id, total_amount, amount_paid, payment_status, phone, customer_name"
+      )
+      .eq(
+        "phone",
+        order.phone
+      )
+      .in(
+        "payment_status",
+        [
+          "Partially Paid",
+          "Pending",
+        ]
+      );
 
-  </button>
+    if (remainingOrdersError) {
+      console.error(
+        remainingOrdersError
+      );
+    }
+
+    // =====================================
+    // CALCULATE REMAINING DEBT
+    // =====================================
+
+    let remainingDebt = 0;
+
+    for (
+      const remainingOrder
+      of remainingOrders || []
+    ) {
+
+      const total =
+        Number(
+          remainingOrder.total_amount || 0
+        );
+
+      const paid =
+        Number(
+          remainingOrder.amount_paid || 0
+        );
+
+      remainingDebt +=
+        Math.max(
+          total - paid,
+          0
+        );
+    }
+
+    // =====================================
+    // FIND DEBTOR
+    // =====================================
+
+    const {
+      data: debtor,
+      error: debtorError,
+    } = await supabase
+      .from("debtors")
+      .select("*")
+      .eq(
+        "phone",
+        order.phone
+      )
+      .maybeSingle();
+
+    if (debtorError) {
+      console.error(
+        debtorError
+      );
+    }
+
+    // =====================================
+    // UPDATE / REMOVE DEBTOR
+    // =====================================
+
+    if (debtor) {
+
+      if (
+        remainingDebt > 0
+      ) {
+
+        // CUSTOMER STILL OWES MONEY
+        await supabase
+          .from("debtors")
+          .update({
+            balance:
+              remainingDebt,
+            status:
+              "Owing",
+          })
+          .eq(
+            "id",
+            debtor.id
+          );
+
+      } else {
+
+        // NO OTHER DEBT
+        await supabase
+          .from("debtors")
+          .delete()
+          .eq(
+            "id",
+            debtor.id
+          );
+      }
+    }
+
+    // =====================================
+    // REFRESH ORDERS
+    // =====================================
+
+    await fetchOrders();
+
+    alert(
+      "Order deleted successfully."
+    );
+
+  }}
+
+  className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg"
+>
+  Delete
+</button>
 
 </td>
 

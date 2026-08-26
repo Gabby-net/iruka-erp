@@ -102,26 +102,76 @@ export default function CustomersPage() {
 
   }
 
-  /* ==================================================
-            CUSTOMER PERFORMANCE MAP
-  ================================================== */
+/* ==================================================
+        REAL CUSTOMER PERFORMANCE MAP
+        SOURCE:
+        customers + orders + sales
+================================================== */
 
-  const customerStats = useMemo(() => {
+const customerStats = useMemo(() => {
 
-    const stats: Record<string, any> = {};
+  const stats: Record<string, any> = {};
 
-    customers.forEach((customer) => {
+  /*
+   * Create a reliable customer key.
+   *
+   * PHONE is preferred because names can be duplicated.
+   * If there is no phone, use normalized customer name.
+   */
+  function getCustomerKey(
+    name?: string | null,
+    phone?: string | null
+  ) {
 
-      const name =
-        customer.full_name ||
-        customer.name ||
-        customer.customer_name;
+    const cleanPhone =
+      String(phone || "")
+        .replace(/\D/g, "");
 
-      if (!name) return;
+    if (cleanPhone) {
+      return `phone:${cleanPhone}`;
+    }
 
-      stats[name] = {
+    const cleanName =
+      String(name || "")
+        .trim()
+        .toLowerCase();
 
-        customer,
+    if (cleanName) {
+      return `name:${cleanName}`;
+    }
+
+    return null;
+  }
+
+  /*
+   * CREATE CUSTOMER RECORD
+   */
+  function ensureCustomer(
+    name?: string | null,
+    phone?: string | null,
+    customerData?: any
+  ) {
+
+    const key =
+      getCustomerKey(name, phone);
+
+    if (!key) return null;
+
+    if (!stats[key]) {
+
+      stats[key] = {
+
+        customer:
+          customerData || null,
+
+        name:
+          name || "Unknown Customer",
+
+        phone:
+          phone || "-",
+
+        email:
+          customerData?.email || "-",
 
         orders: 0,
 
@@ -129,62 +179,243 @@ export default function CustomersPage() {
 
         lastOrder: null,
 
+        lastSale: null,
+
       };
 
-    });
+    } else {
 
-    sales.forEach((sale) => {
-
-      const customerName =
-        sale.customer_name;
-
-      if (!customerName) return;
-
-      if (!stats[customerName]) {
-
-        stats[customerName] = {
-
-          customer: null,
-
-          orders: 0,
-
-          revenue: 0,
-
-          lastOrder: null,
-
-        };
-
-      }
-
-      stats[customerName].orders++;
-
-      stats[customerName].revenue += Number(
-
-        sale.total_amount || 0
-
-      );
-
+      /*
+       * Fill missing information
+       */
       if (
-
-        !stats[customerName].lastOrder ||
-
-        new Date(sale.created_at) >
-
-          new Date(stats[customerName].lastOrder)
-
+        (!stats[key].name ||
+          stats[key].name === "Unknown Customer") &&
+        name
       ) {
 
-        stats[customerName].lastOrder =
-
-          sale.created_at;
+        stats[key].name = name;
 
       }
 
-    });
+      if (
+        (!stats[key].phone ||
+          stats[key].phone === "-") &&
+        phone
+      ) {
 
-    return Object.values(stats);
+        stats[key].phone = phone;
 
-  }, [customers, sales]);
+      }
+
+      if (
+        (!stats[key].email ||
+          stats[key].email === "-") &&
+        customerData?.email
+      ) {
+
+        stats[key].email =
+          customerData.email;
+
+      }
+
+      if (
+        !stats[key].customer &&
+        customerData
+      ) {
+
+        stats[key].customer =
+          customerData;
+
+      }
+
+    }
+
+    return key;
+
+  }
+
+  /* ==================================================
+                1. REGISTERED CUSTOMERS
+  ================================================== */
+
+  customers.forEach((customer) => {
+
+    const name =
+      customer.full_name ||
+      customer.name ||
+      customer.customer_name;
+
+    const phone =
+      customer.phone || "";
+
+    ensureCustomer(
+      name,
+      phone,
+      customer
+    );
+
+  });
+
+  /* ==================================================
+                2. CUSTOMER ORDERS
+  ================================================== */
+
+  orders.forEach((order) => {
+
+    const name =
+      order.customer_name ||
+      "Unknown Customer";
+
+    const phone =
+      order.phone || "";
+
+    const key =
+      ensureCustomer(
+        name,
+        phone
+      );
+
+    if (!key) return;
+
+    /*
+     * Count real orders
+     */
+    stats[key].orders++;
+
+    /*
+     * Use order total as customer revenue
+     *
+     * This gives us the value of actual
+     * customer orders.
+     */
+    stats[key].revenue +=
+      Number(
+        order.total_amount || 0
+      );
+
+    /*
+     * Track latest order
+     */
+    if (
+      order.created_at &&
+      (
+        !stats[key].lastOrder ||
+        new Date(order.created_at) >
+          new Date(stats[key].lastOrder)
+      )
+    ) {
+
+      stats[key].lastOrder =
+        order.created_at;
+
+    }
+
+  });
+
+  /* ==================================================
+                3. SALES
+  ================================================== */
+
+  sales.forEach((sale) => {
+
+    const name =
+      sale.customer_name ||
+      "Unknown Customer";
+
+    /*
+     * sales may or may not have phone
+     */
+    const phone =
+      sale.phone ||
+      sale.customer_phone ||
+      "";
+
+    const key =
+      ensureCustomer(
+        name,
+        phone
+      );
+
+    if (!key) return;
+
+    /*
+     * Only use sales to calculate revenue
+     * if there are no orders for this customer.
+     *
+     * This prevents counting the same customer
+     * transaction twice.
+     */
+
+    if (
+      !orders.some(
+        (order) => {
+
+          const orderKey =
+            getCustomerKey(
+              order.customer_name,
+              order.phone
+            );
+
+          return orderKey === key;
+
+        }
+      )
+    ) {
+
+      stats[key].orders++;
+
+      stats[key].revenue +=
+        Number(
+          sale.total_amount || 0
+        );
+
+    }
+
+    /*
+     * Track latest sale
+     */
+    if (
+      sale.created_at &&
+      (
+        !stats[key].lastSale ||
+        new Date(sale.created_at) >
+          new Date(stats[key].lastSale)
+      )
+    ) {
+
+      stats[key].lastSale =
+        sale.created_at;
+
+    }
+
+    /*
+     * Use latest sale if it is
+     * newer than latest order
+     */
+    if (
+      sale.created_at &&
+      (
+        !stats[key].lastOrder ||
+        new Date(sale.created_at) >
+          new Date(stats[key].lastOrder)
+      )
+    ) {
+
+      stats[key].lastOrder =
+        sale.created_at;
+
+    }
+
+  });
+
+  return Object.values(stats);
+
+}, [
+  customers,
+  orders,
+  sales
+]);
 
   /* ==================================================
                   LOADING SCREEN
@@ -270,32 +501,37 @@ export default function CustomersPage() {
     (a, b) => b.revenue - a.revenue
   )[0];
 
-  const filteredCustomers = customerStats.filter(
-    (customer) => {
+const filteredCustomers = customerStats.filter(
+  (customer) => {
 
-      const customerName =
-        customer.customer?.full_name ||
-        customer.customer?.name ||
-        customer.customer?.customer_name ||
-        "";
+    const customerName =
+      customer.name || "";
 
-      const phone =
-        customer.customer?.phone ||
-        "";
+    const phone =
+      customer.phone || "";
 
-      return (
-        customerName
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
+    const email =
+      customer.email || "";
 
-        phone
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      );
+    const searchText =
+      search.toLowerCase();
 
-    }
-  );
+    return (
+      customerName
+        .toLowerCase()
+        .includes(searchText) ||
 
+      phone
+        .toLowerCase()
+        .includes(searchText) ||
+
+      email
+        .toLowerCase()
+        .includes(searchText)
+    );
+
+  }
+);
     return (
 
     <ProtectedRoute
@@ -665,9 +901,8 @@ export default function CustomersPage() {
 
             <h2 className="text-white text-2xl font-black mt-2">
 
-              {topCustomer?.customer?.full_name ||
-                topCustomer?.customer?.name ||
-                "No Customer"}
+{topCustomer?.name ||
+  "No Customer"}
 
             </h2>
 
@@ -760,23 +995,25 @@ export default function CustomersPage() {
 
                 )}
 
-                {filteredCustomers.map((item: any, index: number) => {
+{filteredCustomers.map((item: any, index: number) => {
 
-                  const customer = item.customer;
+  const name =
+    item.name ||
+    "Unknown Customer";
 
-                  const name =
-                    customer?.full_name ||
-                    customer?.name ||
-                    "Unknown";
+  const phone =
+    item.phone ||
+    "-";
 
-                  const phone =
-                    customer?.phone || "-";
+  const email =
+    item.email ||
+    "-";
 
-                  const revenue =
-                    Number(item.revenue || 0);
+  const revenue =
+    Number(item.revenue || 0);
 
-                  const vip =
-                    revenue >= 100000;
+  const vip =
+    revenue >= 100000;
 
                   return (
 
@@ -803,11 +1040,11 @@ export default function CustomersPage() {
 
                             </p>
 
-                            <p className="text-slate-400 text-sm">
+<p className="text-slate-400 text-sm">
 
-                              {customer?.email || "-"}
+  {email}
 
-                            </p>
+</p>
 
                           </div>
 

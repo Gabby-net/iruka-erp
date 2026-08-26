@@ -99,6 +99,231 @@ const [paymentLoading, setPaymentLoading] = useState(false);
     fetchDebtors();
   }
 
+  async function recordDebtorPayment() {
+  if (!selectedDebtor) {
+    alert("No debtor selected.");
+    return;
+  }
+
+  const amount = Number(paymentAmount);
+
+  if (!amount || amount <= 0) {
+    alert("Enter a valid payment amount.");
+    return;
+  }
+
+  const currentDebt = Number(
+    selectedDebtor.balance || 0
+  );
+
+  if (amount > currentDebt) {
+    alert(
+      `Payment cannot be greater than the outstanding debt of ₦${currentDebt.toLocaleString()}.`
+    );
+    return;
+  }
+
+  setPaymentLoading(true);
+
+  try {
+
+    // ==========================================
+    // FIND CUSTOMER'S OUTSTANDING ORDERS
+    // ==========================================
+
+    const {
+      data: outstandingOrders,
+      error: ordersError,
+    } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("phone", selectedDebtor.phone)
+      .in(
+        "payment_status",
+        [
+          "Partially Paid",
+          "Pending",
+        ]
+      )
+      .order("created_at", {
+        ascending: true,
+      });
+
+    if (ordersError) {
+      throw ordersError;
+    }
+
+    let remainingPayment = amount;
+
+    // ==========================================
+    // APPLY PAYMENT TO ORDERS
+    // ==========================================
+
+    for (
+      const order of outstandingOrders || []
+    ) {
+
+      if (remainingPayment <= 0) {
+        break;
+      }
+
+      const total =
+        Number(order.total_amount || 0);
+
+      const alreadyPaid =
+        Number(order.amount_paid || 0);
+
+      const orderBalance =
+        Math.max(
+          total - alreadyPaid,
+          0
+        );
+
+      if (orderBalance <= 0) {
+        continue;
+      }
+
+      const paymentForOrder =
+        Math.min(
+          remainingPayment,
+          orderBalance
+        );
+
+      const newAmountPaid =
+        alreadyPaid +
+        paymentForOrder;
+
+      const newBalance =
+        total -
+        newAmountPaid;
+
+      let newPaymentStatus =
+        "Partially Paid";
+
+      if (newBalance <= 0) {
+        newPaymentStatus = "Paid";
+      }
+
+      // ========================================
+      // UPDATE ORDER
+      // ========================================
+
+      const {
+        error: updateOrderError,
+      } = await supabase
+        .from("orders")
+        .update({
+          amount_paid:
+            newAmountPaid,
+
+          payment_status:
+            newPaymentStatus,
+        })
+        .eq(
+          "id",
+          order.id
+        );
+
+      if (updateOrderError) {
+        throw updateOrderError;
+      }
+
+      remainingPayment -=
+        paymentForOrder;
+    }
+
+    // ==========================================
+    // CALCULATE NEW DEBTOR BALANCE
+    // ==========================================
+
+    const newDebtorBalance =
+      Math.max(
+        currentDebt - amount,
+        0
+      );
+
+    const newDebtorStatus =
+      newDebtorBalance === 0
+        ? "Paid"
+        : "Owing";
+
+    // ==========================================
+    // UPDATE DEBTOR
+    // ==========================================
+
+    const {
+      error: debtorUpdateError,
+    } = await supabase
+      .from("debtors")
+      .update({
+        balance:
+          newDebtorBalance,
+
+        status:
+          newDebtorStatus,
+      })
+      .eq(
+        "id",
+        selectedDebtor.id
+      );
+
+    if (debtorUpdateError) {
+      throw debtorUpdateError;
+    }
+
+    // ==========================================
+    // RECORD DEBTOR PAYMENT
+    // ==========================================
+
+const {
+  error: paymentRecordError,
+} = await supabase
+  .from("debtor_payments")
+  .insert({
+    debtor_id: selectedDebtor.id,
+    amount_paid: amount,
+    payment_date: new Date().toISOString(),
+    notes: `Payment received from ${selectedDebtor.customer_name}`,
+  });
+
+if (paymentRecordError) {
+  throw paymentRecordError;
+}
+
+    // ==========================================
+    // REFRESH
+    // ==========================================
+
+    setPaymentAmount("");
+
+    setPaymentModalOpen(false);
+
+    setSelectedDebtor(null);
+
+    await fetchDebtors();
+
+    alert(
+      `Payment of ₦${amount.toLocaleString()} recorded successfully.\n\nRemaining balance: ₦${newDebtorBalance.toLocaleString()}`
+    );
+
+  } catch (error: any) {
+
+    console.error(
+      "Debtor payment error:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to record debtor payment."
+    );
+
+  } finally {
+
+    setPaymentLoading(false);
+  }
+}
+
   const totalDebt = debtors.reduce(
     (sum, debtor) => sum + Number(debtor.balance || 0),
     0
@@ -959,28 +1184,70 @@ const filteredDebtors = useMemo(() => {
 
 <td className="px-8 py-6">
 
-  <div className="flex items-center justify-center gap-2">
+  <div className="flex items-center justify-center gap-3">
+
+    {/* =========================
+        PAYMENT BUTTON
+    ========================= */}
 
     <button
-      className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition-all"
-    >
-      View
-    </button>
-
-    <button
-      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
+      type="button"
+      onClick={() => {
+        setSelectedDebtor(debtor);
+        setPaymentAmount("");
+        setPaymentModalOpen(true);
+      }}
+      disabled={Number(debtor.balance || 0) <= 0}
+      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-bold transition-all shadow-lg"
     >
       Payment
     </button>
 
-    <button
-      className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-sm font-semibold transition-all"
-    >
-      Edit
-    </button>
+
+    {/* =========================
+        DELETE BUTTON
+    ========================= */}
 
     <button
-      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-all"
+      type="button"
+      onClick={async () => {
+
+        const confirmed = window.confirm(
+          `Delete ${debtor.customer_name}'s debtor account?`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        const {
+          error,
+        } = await supabase
+          .from("debtors")
+          .delete()
+          .eq("id", debtor.id);
+
+        if (error) {
+
+          alert(
+            `Unable to delete debtor: ${error.message}`
+          );
+
+          return;
+        }
+
+        setDebtors((current) =>
+          current.filter(
+            (d) => d.id !== debtor.id
+          )
+        );
+
+        alert(
+          "Debtor account deleted successfully."
+        );
+
+      }}
+      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold transition-all shadow-lg"
     >
       Delete
     </button>
@@ -1038,6 +1305,191 @@ const filteredDebtors = useMemo(() => {
 </div>
 
 </div>
+
+
+{/* =====================================================
+    PAYMENT MODAL
+===================================================== */}
+
+{paymentModalOpen && selectedDebtor && (
+
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+
+    <div className="w-full max-w-xl rounded-[30px] border border-white/10 bg-[#0D1728] shadow-2xl overflow-hidden">
+
+      {/* MODAL HEADER */}
+
+      <div className="px-8 py-7 border-b border-white/10 bg-gradient-to-r from-[#0B1F3A] to-[#102B52]">
+
+        <div className="flex items-center justify-between">
+
+          <div>
+
+            <span className="inline-flex px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold uppercase tracking-wider">
+
+              Customer Repayment
+
+            </span>
+
+            <h2 className="text-3xl font-black text-white mt-3">
+
+              Record Payment
+
+            </h2>
+
+            <p className="text-slate-400 mt-2">
+
+              Receive payment from {selectedDebtor.customer_name}
+
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPaymentModalOpen(false);
+              setSelectedDebtor(null);
+              setPaymentAmount("");
+            }}
+            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xl transition"
+          >
+            ×
+          </button>
+
+        </div>
+
+      </div>
+
+
+      {/* MODAL BODY */}
+
+      <div className="p-8 space-y-6">
+
+        {/* CUSTOMER */}
+
+        <div className="rounded-2xl border border-white/10 bg-[#162844] p-5">
+
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+            Customer
+
+          </p>
+
+          <h3 className="text-xl font-bold text-white mt-2">
+
+            {selectedDebtor.customer_name}
+
+          </h3>
+
+          <p className="text-slate-400 mt-1">
+
+            {selectedDebtor.phone || "No phone number"}
+
+          </p>
+
+        </div>
+
+
+        {/* CURRENT BALANCE */}
+
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5">
+
+          <p className="text-xs uppercase tracking-[0.2em] text-red-300">
+
+            Outstanding Balance
+
+          </p>
+
+          <h3 className="text-3xl font-black text-red-400 mt-2">
+
+            ₦{Number(
+              selectedDebtor.balance || 0
+            ).toLocaleString()}
+
+          </h3>
+
+        </div>
+
+
+        {/* PAYMENT AMOUNT */}
+
+        <div>
+
+          <label className="block text-sm font-bold text-slate-300 mb-3">
+
+            Amount Paid
+
+          </label>
+
+          <input
+            type="number"
+            min="1"
+            max={Number(selectedDebtor.balance || 0)}
+            value={paymentAmount}
+            onChange={(e) =>
+              setPaymentAmount(e.target.value)
+            }
+            placeholder="Enter amount received"
+            autoFocus
+            className="w-full rounded-2xl border border-white/10 bg-[#162844] px-5 py-5 text-white text-xl font-bold placeholder:text-slate-500 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          />
+
+          <p className="text-xs text-slate-500 mt-2">
+
+            Maximum payment: ₦
+            {Number(
+              selectedDebtor.balance || 0
+            ).toLocaleString()}
+
+          </p>
+
+        </div>
+
+
+        {/* BUTTONS */}
+
+        <div className="flex gap-4 pt-2">
+
+          <button
+            type="button"
+            onClick={() => {
+              setPaymentModalOpen(false);
+              setSelectedDebtor(null);
+              setPaymentAmount("");
+            }}
+            className="flex-1 px-6 py-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 font-bold transition"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={recordDebtorPayment}
+            disabled={
+              paymentLoading ||
+              !paymentAmount ||
+              Number(paymentAmount) <= 0
+            }
+            className="flex-1 px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-black transition shadow-xl"
+          >
+
+            {paymentLoading
+              ? "Processing..."
+              : "Confirm Payment"}
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+)}
+
 
 </div>
 
