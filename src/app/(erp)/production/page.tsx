@@ -419,20 +419,47 @@ const nylonNeeded =
    Jumbo Fruits
 ========================== */
 
-const resinNeeded =
+/* =========================
+   RESINS
+   1 KG PER DOUGH BATCH
+   PRODUCTS:
+   Small Rosy
+   Classic Fruits
+   Jumbo Fruits
+   Big Brother Family
+
+   INVENTORY IS STORED IN CARTONS
+   1 CARTON = 10 KG
+========================== */
+
+const resinNeededKg =
   [
-    "Big Brother Family",
     "Small Rosy",
+    "Classic Fruits",
     "Jumbo Fruits",
+    "Big Brother Family",
   ].includes(selectedProduct)
     ? batches
     : 0;
 
- /* =========================
+/*
+ * Convert KG consumption into cartons
+ *
+ * 1 carton = 10kg
+ */
+const resinNeededCartons =
+  resinNeededKg / 10;
+
+/* =========================
    INVENTORY VALIDATION
 ========================== */
 
 const requiredMaterials = [
+
+  /* =========================
+     FLOUR
+     2 BAGS PER DOUGH BATCH
+  ========================== */
 
   {
     item: flour,
@@ -440,11 +467,23 @@ const requiredMaterials = [
     amount: flourNeeded,
   },
 
+  /* =========================
+     SUGAR
+     12 KG PER DOUGH BATCH
+     INVENTORY STORED IN 50KG BAGS
+  ========================== */
+
   {
     item: sugar,
     name: "Sugar",
     amount: sugarNeeded,
   },
+
+  /* =========================
+     BUTTER
+     1.35 KG PER DOUGH BATCH
+     INVENTORY STORED IN 15KG UNITS
+  ========================== */
 
   {
     item: butter,
@@ -452,11 +491,22 @@ const requiredMaterials = [
     amount: butterNeeded,
   },
 
+  /* =========================
+     YEAST
+     1 UNIT PER DOUGH BATCH
+  ========================== */
+
   {
     item: yeast,
     name: "Yeast",
     amount: yeastNeeded,
   },
+
+  /* =========================
+     GROUNDNUT OIL
+     0.23 KG PER DOUGH BATCH
+     INVENTORY STORED IN 23KG UNITS
+  ========================== */
 
   {
     item: groundnutOil,
@@ -464,11 +514,21 @@ const requiredMaterials = [
     amount: groundnutOilNeeded,
   },
 
+  /* =========================
+     RECIPE
+     1 PACK PER DOUGH BATCH
+  ========================== */
+
   {
     item: recipeInventory,
     name: recipeName,
     amount: recipeNeeded,
   },
+
+  /* =========================
+     FLAVOUR
+     0.25 KG PER DOUGH BATCH
+  ========================== */
 
   {
     item: flavour,
@@ -476,13 +536,94 @@ const requiredMaterials = [
     amount: flavourNeeded,
   },
 
-  /* PRODUCT-SPECIFIC NYLON */
+  /* =========================
+     PRODUCT-SPECIFIC NYLON
+     1 NYLON PER PRODUCED PIECE
+  ========================== */
 
   {
     item: nylon,
     name: nylonName,
     amount: nylonNeeded,
   },
+
+  /* =========================
+     BROWN
+     0.5 L PER DOUGH BATCH
+
+     PRODUCTS:
+     Small Iruka
+     Big Smart
+     Medium Iruka
+     Classic Iruka
+     Jumbo Iruka
+  ========================== */
+
+  ...(brownNeeded > 0
+    ? [
+        {
+          item: brown,
+          name: "Brown",
+          amount: brownNeeded,
+        },
+      ]
+    : []),
+
+  /* =========================
+     TAPE
+     0.8181 PACK PER DOUGH BATCH
+
+     PRODUCTS:
+     Small Iruka
+     Small Rosy
+  ========================== */
+
+  ...(tapeNeeded > 0
+    ? [
+        {
+          item: tape,
+          name: "Tape",
+          amount: tapeNeeded,
+        },
+      ]
+    : []),
+
+  /* =========================
+     TWIST
+     1 STRIP PER PIECE
+     600 STRIPS = 1 PACK
+
+     Therefore:
+     produced / 600
+  ========================== */
+
+  ...(twistNeeded > 0
+    ? [
+        {
+          item: twist,
+          name: "Twist",
+          amount: twistNeeded,
+        },
+      ]
+    : []),
+
+  /* =========================
+     RESINS
+     1 KG PER DOUGH BATCH
+
+     INVENTORY:
+     1 CARTON = 10 KG
+  ========================== */
+
+  ...(resinNeededCartons > 0
+    ? [
+        {
+          item: resins,
+          name: "Resins",
+          amount: resinNeededCartons,
+        },
+      ]
+    : []),
 
 ];
 
@@ -913,14 +1054,33 @@ if (!nylonName) {
   );
 }
 
-    const resinUsed =
-      [
-        "Big Brother Family",
-        "Small Rosy",
-        "Jumbo Fruits",
-      ].includes(log.bread)
-        ? batches
-        : 0;
+/* =========================
+   RESINS
+
+   1 KG PER DOUGH BATCH
+
+   Products:
+   Small Rosy
+   Classic Fruits
+   Jumbo Fruits
+   Big Brother Family
+
+   Inventory is stored in cartons.
+   1 carton = 10kg.
+========================== */
+
+const resinUsedKg =
+  [
+    "Small Rosy",
+    "Classic Fruits",
+    "Jumbo Fruits",
+    "Big Brother Family",
+  ].includes(log.bread)
+    ? batches
+    : 0;
+
+const resinUsedCartons =
+  resinUsedKg / 10;
 
     /* =========================
        GET INVENTORY
@@ -999,12 +1159,12 @@ if (!nylonName) {
       });
     }
 
-    if (resinUsed > 0) {
-      materialsToRestore.push({
-        name: "Resins",
-        amount: resinUsed,
-      });
-    }
+if (resinUsedCartons > 0) {
+  materialsToRestore.push({
+    name: "Resins",
+    amount: resinUsedCartons,
+  });
+}
 
     /* =========================
        VERIFY ALL INVENTORY ITEMS

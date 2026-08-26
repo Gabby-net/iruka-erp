@@ -11,23 +11,38 @@ export default function RecipePreview({
   selectedProduct,
   recipeName,
 }: RecipePreviewProps) {
-
   const batches = Number(doughBatches || 0);
+  const produced = Number(quantityProduced || 0);
 
   /* =========================
      BASIC MATERIALS
   ========================== */
 
+  // Flour
+  // 2 bags per dough batch
   const flour = batches * 2;
 
-  const sugar = batches * 12;
+  // Sugar
+  // 12kg per batch
+  // Inventory is stored in 50kg bags
+  const sugarKg = batches * 12;
+  const sugarBags = sugarKg / 50;
 
-  const butter = batches * 1.35;
+  // Butter
+  // 1.35kg per batch
+  // Inventory is stored in 15kg units
+  const butterKg = batches * 1.35;
+  const butterUnits = butterKg / 15;
 
-  const yeast = batches * 0.5;
+  // Yeast
+  // 1 inventory unit per batch
+  const yeast = batches;
 
-  const oil = batches * 0.23;
-
+  // Groundnut oil
+  // 0.23kg per batch
+  // Inventory is stored in 23kg units
+  const oilKg = batches * 0.23;
+  const oilUnits = oilKg / 23;
 
   /* =========================
      RECIPE
@@ -35,14 +50,12 @@ export default function RecipePreview({
 
   const recipe = batches;
 
-
   /* =========================
      FLAVOUR
      0.25 KG PER BATCH
   ========================== */
 
   const flavour = batches * 0.25;
-
 
   /* =========================
      BROWN
@@ -67,10 +80,9 @@ export default function RecipePreview({
       ? batches * 0.5
       : 0;
 
-
   /* =========================
      TAPE
-     0.8181 PER BATCH
+     0.8181 PACK PER BATCH
 
      ONLY:
      Small Iruka
@@ -85,84 +97,105 @@ export default function RecipePreview({
       ? batches * 0.8181
       : 0;
 
+  /* =========================
+     TWIST
+     1 STRIP PER PIECE
+
+     Inventory:
+     600 strips = 1 pack
+
+     Therefore:
+     produced / 600 = packs
+  ========================== */
+
+  const twist =
+    [
+      "Big Smart",
+      "Medium Rosy",
+      "Medium Iruka",
+      "Jumbo Fruits",
+      "Jumbo Iruka",
+      "Classic Fruits",
+      "Classic Iruka",
+      "Big Brother Family",
+    ].includes(selectedProduct)
+      ? produced / 600
+      : 0;
 
   /* =========================
      RESINS
-     1 KG PER BATCH
+     1 KG PER DOUGH BATCH
 
-     ONLY:
-     Big Brother Family
+     PRODUCTS:
      Small Rosy
+     Classic Fruits
      Jumbo Fruits
+     Big Brother Family
+
+     Inventory:
+     1 carton = 10 KG
   ========================== */
 
-  const resins =
+  const resinKg =
     [
-      "Big Brother Family",
       "Small Rosy",
+      "Classic Fruits",
       "Jumbo Fruits",
+      "Big Brother Family",
     ].includes(selectedProduct)
       ? batches
       : 0;
 
+  const resinCartons = resinKg / 10;
 
   /* =========================
-     NYLON
-
-     IMPORTANT:
-     Nylon is calculated from
-     PRODUCED PIECES, not dough
-     batches.
-
-     The production form does
-     not currently pass quantityProduced
-     into this component.
-
-     Therefore we cannot accurately
-     display the exact nylon quantity
-     here yet.
+     PRODUCT NYLON
+     1 NYLON PER PRODUCED PIECE
   ========================== */
 
   const nylonNameMap: Record<string, string> = {
-
-    "Small Iruka":
-      "Small Iruka Nylon",
-
-    "Small Rosy":
-      "Small Rosy Nylon",
-
-    "Medium Iruka":
-      "Medium Iruka Nylon",
-
-    "Medium Rosy":
-      "Medium Rosy Nylon",
-
-    "Big Smart":
-      "Big Smart Nylon",
-
-    "Classic Iruka":
-      "Classic Iruka Nylon",
-
-    "Classic Fruits":
-      "Classic Fruits Nylon",
-
-    "Jumbo Iruka":
-      "Jumbo Iruka Nylon",
-
-    "Jumbo Fruits":
-      "Jumbo Fruits Nylon",
-
-    "Big Brother Family":
-      "Big Brother Family Nylon",
-
+    "Small Iruka": "Small Iruka Nylon",
+    "Small Rosy": "Small Rosy Nylon",
+    "Medium Iruka": "Medium Iruka Nylon",
+    "Medium Rosy": "Medium Rosy Nylon",
+    "Big Smart": "Big Smart Nylon",
+    "Classic Iruka": "Classic Iruka Nylon",
+    "Classic Fruits": "Classic Fruits Nylon",
+    "Jumbo Iruka": "Jumbo Iruka Nylon",
+    "Jumbo Fruits": "Jumbo Fruits Nylon",
+    "Big Brother Family": "Big Brother Family Nylon",
   };
 
-  const nylonName =
-    nylonNameMap[selectedProduct] || "";
+  const nylonName = nylonNameMap[selectedProduct] || "";
 
+  const nylon = produced;
+
+  /* =========================
+     NO PRODUCT SELECTED
+  ========================== */
+
+  if (!selectedProduct) {
+    return (
+      <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-8">
+        <h2 className="text-3xl font-black text-[#071028]">
+          Live Recipe Preview
+        </h2>
+
+        <p className="text-gray-500 mt-2">
+          Select a product and enter production quantities to see the
+          materials that will be automatically deducted.
+        </p>
+
+        <div className="mt-8 bg-slate-50 rounded-2xl p-6 text-center">
+          <p className="text-slate-500 font-semibold">
+            No production selected yet.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-
     <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-8">
 
       {/* =========================
@@ -172,37 +205,57 @@ export default function RecipePreview({
       <div className="flex justify-between items-start gap-4">
 
         <div>
-
           <h2 className="text-3xl font-black text-[#071028]">
             Live Recipe Preview
           </h2>
 
           <p className="text-gray-500 mt-2">
-            Inventory that will be consumed
+            Exact inventory quantities that will be consumed
           </p>
-
         </div>
 
         <div className="flex flex-col items-end gap-2">
 
           <div className="bg-green-100 text-green-700 rounded-2xl px-4 py-2 font-bold">
-
             {recipeName
               ? `${recipeName} RECIPE`
               : "No Recipe"}
-
           </div>
 
           <span className="text-sm text-gray-500">
-
-            {selectedProduct || "No Product"}
-
+            {selectedProduct}
           </span>
 
         </div>
-
       </div>
 
+      {/* =========================
+          PRODUCTION INPUT SUMMARY
+      ========================== */}
+
+      <div className="grid grid-cols-2 gap-4 mt-8">
+
+        <div className="bg-slate-50 rounded-2xl p-4">
+          <p className="text-sm text-slate-500">
+            Dough Batches
+          </p>
+
+          <p className="text-2xl font-black text-slate-900 mt-1">
+            {batches.toLocaleString()}
+          </p>
+        </div>
+
+        <div className="bg-slate-50 rounded-2xl p-4">
+          <p className="text-sm text-slate-500">
+            Pieces Produced
+          </p>
+
+          <p className="text-2xl font-black text-slate-900 mt-1">
+            {produced.toLocaleString()}
+          </p>
+        </div>
+
+      </div>
 
       {/* =========================
           MATERIALS
@@ -217,22 +270,22 @@ export default function RecipePreview({
 
         <RecipeRow
           title="Sugar"
-          value={`${sugar.toLocaleString()} kg`}
+          value={`${sugarBags.toFixed(2)} Bags (${sugarKg.toFixed(2)} kg)`}
         />
 
         <RecipeRow
           title="Butter"
-          value={`${butter.toFixed(2)} kg`}
+          value={`${butterUnits.toFixed(2)} Units (${butterKg.toFixed(2)} kg)`}
         />
 
         <RecipeRow
           title="Yeast"
-          value={`${yeast.toFixed(2)} kg`}
+          value={`${yeast.toFixed(2)} Units`}
         />
 
         <RecipeRow
           title="Groundnut Oil"
-          value={`${oil.toFixed(2)} kg`}
+          value={`${oilUnits.toFixed(2)} Units (${oilKg.toFixed(2)} kg)`}
         />
 
         <RecipeRow
@@ -245,81 +298,62 @@ export default function RecipePreview({
           value={`${flavour.toFixed(2)} kg`}
         />
 
-
         {/* =========================
-            PRODUCT NYLON
+            NYLON
         ========================== */}
 
         {nylonName && (
-
           <RecipeRow
             title={nylonName}
-            value="Based on pieces produced"
+            value={`${nylon.toLocaleString()} Pieces`}
           />
-
         )}
 
-
         {/* =========================
-            CONDITIONAL MATERIALS
+            BROWN
         ========================== */}
 
         {brown > 0 && (
-
           <RecipeRow
             title="Brown"
             value={`${brown.toFixed(2)} L`}
           />
-
         )}
+
+        {/* =========================
+            TAPE
+        ========================== */}
 
         {tape > 0 && (
-
           <RecipeRow
             title="Tape"
-            value={`${tape.toFixed(2)} Packs`}
+            value={`${tape.toFixed(4)} Packs`}
           />
-
         )}
 
-        {resins > 0 && (
+        {/* =========================
+            TWIST
+        ========================== */}
 
+        {twist > 0 && (
+          <RecipeRow
+            title="Twist"
+            value={`${twist.toFixed(2)} Packs`}
+          />
+        )}
+
+        {/* =========================
+            RESINS
+        ========================== */}
+
+        {resinCartons > 0 && (
           <RecipeRow
             title="Resins"
-            value={`${resins.toFixed(2)} kg`}
+            value={`${resinCartons.toFixed(2)} Cartons (${resinKg.toFixed(2)} kg)`}
           />
-
         )}
 
       </div>
-
-
-      {/* =========================
-          TWIST
-      ========================== */}
-
-      {[
-        "Big Smart",
-        "Medium Rosy",
-        "Medium Iruka",
-        "Jumbo Fruits",
-        "Jumbo Iruka",
-        "Classic Fruits",
-        "Classic Iruka",
-        "Big Brother Family",
-      ].includes(selectedProduct) && (
-
-        <div className="mt-4">
-
-          <RecipeRow
-            title="Twist"
-            value="Based on pieces produced"
-          />
-
-        </div>
-
-      )}
-
 
       {/* =========================
           BATCH SUMMARY
@@ -328,21 +362,16 @@ export default function RecipePreview({
       <div className="mt-10 bg-blue-50 rounded-2xl p-5">
 
         <p className="text-blue-900 font-bold text-lg">
-
           {batches} Dough Batch
           {batches !== 1 ? "es" : ""}
-
         </p>
 
         <p className="text-gray-600 mt-2">
-
-          The materials above will be deducted automatically
-          when production is uploaded.
-
+          These quantities will be deducted automatically from inventory
+          when this production is uploaded.
         </p>
 
       </div>
-
 
       {/* =========================
           IMPORTANT NOTICE
@@ -351,17 +380,14 @@ export default function RecipePreview({
       <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
 
         <p className="text-amber-800 text-sm font-semibold">
-
-          ⚠ Nylon and Twist quantities are calculated from
-          the actual number of bread pieces produced,
-          not dough batches.
-
+          ⚠ Nylon and Twist are calculated from the actual bread pieces
+          produced. Resins are calculated from dough batches and converted
+          to cartons using 10 kg per carton.
         </p>
 
       </div>
 
     </div>
-
   );
 }
 
@@ -377,25 +403,17 @@ function RecipeRow({
   title: string;
   value: string;
 }) {
-
   return (
-
     <div className="flex justify-between items-center border-b border-slate-100 pb-3 gap-4">
 
       <span className="font-semibold text-gray-700">
-
         {title}
-
       </span>
 
       <span className="text-lg font-black text-red-600 text-right">
-
         {value}
-
       </span>
 
     </div>
-
   );
-
 }
