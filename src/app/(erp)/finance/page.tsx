@@ -43,6 +43,26 @@ const [lastUpdated, setLastUpdated] =
 
 const [description, setDescription] = useState("");
 
+{/* Description */}
+
+<div className="lg:col-span-2">
+
+  <label className="block text-sm font-semibold text-slate-300 mb-3">
+    Description
+  </label>
+
+  <textarea
+    placeholder="Add additional details about this expense..."
+    value={description}
+    onChange={(e) =>
+      setDescription(e.target.value)
+    }
+    rows={4}
+    className="w-full rounded-2xl border border-white/10 bg-[#162844] text-white px-5 py-4 placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition resize-none"
+  />
+
+</div>
+
   // ===============================
   // FINANCE SUMMARY
   // ===============================
@@ -95,10 +115,6 @@ const [description, setDescription] = useState("");
   // ===============================
   // LOAD DATA
   // ===============================
-
-  useEffect(() => {
-    fetchFinance();
-  }, []);
 
   useEffect(() => {
   fetchFinance();
@@ -451,11 +467,16 @@ const materialCost =
 // - Business Expenses
 // = Net Profit
 
+
+// ===============================
+// REAL FINANCIAL TOTALS
+// ===============================
+
+const totalCost =
+  expenseTotal + materialCost;
+
 const profit =
-  revenue -
-  materialCost -
-  expenseTotal;
-
+  revenue - totalCost;
 
 // ===============================
 // UPDATE FINANCE
@@ -463,22 +484,7 @@ const profit =
 
 setTotalRevenue(revenue);
 
-setTotalExpenses(
-  expenseTotal + materialCost
-);
-
-setNetProfit(profit);
-
-
-// ===============================
-// UPDATE FINANCE
-// ===============================
-
-setTotalRevenue(revenue);
-
-setTotalExpenses(
-  expenseTotal
-);
+setTotalExpenses(totalCost);
 
 setNetProfit(profit);
 
@@ -528,35 +534,120 @@ setNetProfit(profit);
         0
       );
 
-    const todayProfitTotal =
-      todayRevenueTotal -
-      todayExpenseTotal;
+// ===============================
+// TODAY MATERIAL COST
+// ===============================
 
-    setTodayRevenue(todayRevenueTotal);
+const todayMaterialCost =
+  materialTransactions.reduce(
+    (sum, transaction) => {
 
-    setTodayExpenses(todayExpenseTotal);
+      const transactionDate =
+        new Date(transaction.created_at);
 
-    setTodayProfit(todayProfitTotal);
+      const isToday =
+        transactionDate.getDate() === now.getDate() &&
+        transactionDate.getMonth() === now.getMonth() &&
+        transactionDate.getFullYear() === now.getFullYear();
 
+      if (!isToday) {
+        return sum;
+      }
+
+      const type =
+        String(
+          transaction.transaction_type || ""
+        ).toUpperCase();
+
+      if (
+        type !== "ISSUED" &&
+        type !== "AUTO_DEDUCTION"
+      ) {
+        return sum;
+      }
+
+      const quantity =
+        Math.abs(
+          Number(
+            transaction.quantity_used ??
+            transaction.quantity ??
+            0
+          )
+        );
+
+      const inventoryItem =
+        allInventoryItems.find(
+          (item) =>
+            (
+              transaction.inventory_id &&
+              String(item.id) ===
+                String(transaction.inventory_id)
+            ) ||
+            (
+              transaction.material_id &&
+              String(item.id) ===
+                String(transaction.material_id)
+            )
+        );
+
+      const unitCost =
+        Number(
+          inventoryItem?.unit_cost ??
+          inventoryItem?.cost_per_unit ??
+          0
+        );
+
+      return sum + quantity * unitCost;
+    },
+    0
+  );
+
+
+// ===============================
+// TODAY TOTAL COST
+// ===============================
+
+const todayTotalCost =
+  todayExpenseTotal +
+  todayMaterialCost;
+
+
+// ===============================
+// TODAY REAL PROFIT
+// ===============================
+
+const todayProfitTotal =
+  todayRevenueTotal -
+  todayTotalCost;
+
+
+setTodayRevenue(
+  todayRevenueTotal
+);
+
+setTodayExpenses(
+  todayTotalCost
+);
+
+setTodayProfit(
+  todayProfitTotal
+);
     // ===============================
     // CASH FLOW
     // ===============================
 
-    setCashFlow(
-      todayRevenueTotal -
-        todayExpenseTotal
-    );
+setCashFlow(
+  todayRevenueTotal -
+    todayTotalCost
+);
 
     // ===============================
     // MONTHLY SUMMARY
     // ===============================
 
-    setMonthlyRevenue(revenue);
+setMonthlyRevenue(revenue);
 
-    setMonthlyExpenses(expenseTotal);
-
-    setMonthlyRevenue(revenue);
-setMonthlyExpenses(expenseTotal);
+setMonthlyExpenses(totalCost);
 
 setLastUpdated(new Date());
 
@@ -579,13 +670,13 @@ async function addExpense() {
   const { error } = await supabase
     .from("expenses")
 .insert([
-{
-title,
-amount: Number(amount),
-category,
-},
+  {
+    title,
+    amount: Number(amount),
+    category,
+    description,
+  },
 ])
-
   if (error) {
     alert(error.message);
     return;
@@ -594,6 +685,7 @@ category,
 setTitle("");
 setAmount("");
 setCategory("");
+setDescription("");
 
   fetchFinance();
 }
