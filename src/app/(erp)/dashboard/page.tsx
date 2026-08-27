@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 
@@ -16,17 +15,16 @@ import {
 } from "lucide-react";
 
 import {
-ResponsiveContainer,
-AreaChart,
-Area,
-CartesianGrid,
-XAxis,
-YAxis,
-Tooltip,
-PieChart,
-Pie,
-Cell,
-Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 const COLORS = [
@@ -38,344 +36,364 @@ const COLORS = [
   "#EC4899",
 ];
 
-export default function DashboardPage() {
-
-  const router = useRouter();
-
-  /* ============================
-          DATABASE STATES
-  ============================ */
-
-  const [sales, setSales] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [debtors, setDebtors] = useState<any[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-const [showOrderModal, setShowOrderModal] = useState(false);
-
-  const [loading, setLoading] = useState(true);
-
-  /* ============================
-            FETCH DATA
-  ============================ */
-
-  useEffect(() => {
-
-    fetchDashboard();
-
-  }, []);
-
-  async function fetchDashboard() {
-
-    setLoading(true);
-
-    try {
-
-const [
-  salesRes,
-  productRes,
-  inventoryRes,
-  expenseRes,
-  ordersRes,
-  debtorRes,
-] = await Promise.all([
-
-        supabase
-          .from("sales")
-          .select("*"),
-
-        supabase
-          .from("products")
-          .select("*"),
-
-        supabase
-          .from("inventory")
-          .select("*"),
-
-        supabase
-          .from("expenses")
-          .select("*"),
-
-        supabase
-  .from("orders")
-  .select("*")
-  .order("created_at", { ascending: false })
-  .limit(10),  
-
-        supabase
-          .from("debtors")
-          .select("*"),
-
-      ]);
-
-setSales(salesRes.data || []);
-
-setProducts(productRes.data || []);
-
-setInventory(inventoryRes.data || []);
-
-setExpenses(expenseRes.data || []);
-
-setRecentOrders(ordersRes.data || []);
-
-setDebtors(debtorRes.data || []);
-
-    } catch (error) {
-
-      console.error(error);
-
-    }
-
-    setLoading(false);
-
-  }
-
-  /* ============================
-        KPI CALCULATIONS
-  ============================ */
-
-  const revenue = sales.reduce(
-
-    (sum, sale) =>
-
-      sum + Number(sale.total_amount || 0),
-
-    0
-
-  );
-
-  const totalExpenses = expenses.reduce(
-
-    (sum, expense) =>
-
-      sum + Number(expense.amount || 0),
-
-    0
-
-  );
-
-  const totalDebts = debtors.reduce(
-
-    (sum, debtor) =>
-
-      sum + Number(debtor.balance || 0),
-
-    0
-
-  );
-
-  const flour = inventory.find(
-
-    item =>
-
-      item.name?.toLowerCase().includes("flour")
-
-  );
-
-  const flourBags = Number(
-
-    flour?.quantity || 0
-
-  );
-
-  /* ============================
-        REVENUE GRAPH
-  ============================ */
-
-  const revenueChart = Object.values(
-
-    sales.reduce((acc: any, sale: any) => {
-
-      const day = new Date(
-
-        sale.created_at
-
-      ).toLocaleDateString(
-
-        "en-GB",
-
-        {
-
-          day: "numeric",
-
-          month: "short",
-
-        }
-
-      );
-
-      if (!acc[day]) {
-
-        acc[day] = {
-
-          day,
-
-          sales: 0,
-
-        };
-
-      }
-
-      acc[day].sales += Number(
-
-        sale.total_amount || 0
-
-      );
-
-      return acc;
-
-    }, {})
-
-  );
-
-  /* ============================
-      PRODUCT STOCK PIE CHART
-  ============================ */
-
-  const stockChart = products
-
-    .filter(
-
-      product =>
-
-        Number(product.stock) > 0
-
-    )
-
-    .map(product => ({
-
-      name: product.name,
-
-      value: Number(product.stock),
-
-    }));
-
-/* ============================
-      BEST SELLING PRODUCT
-============================ */
-
 type ProductSalesSummary = {
   quantity: number;
   revenue: number;
 };
-
-const productSales: Record<string, ProductSalesSummary> = {};
-
-sales.forEach((sale) => {
-
-  const productName = sale.product_name;
-
-  if (!productName) return;
-
-  if (!productSales[productName]) {
-
-    productSales[productName] = {
-      quantity: 0,
-      revenue: 0,
-    };
-
-  }
-
-  productSales[productName].quantity += Number(
-    sale.quantity || 0
-  );
-
-  productSales[productName].revenue += Number(
-    sale.total_amount || 0
-  );
-
-});
-
-const bestSellingProducts = Object.entries(productSales) as [
-  string,
-  ProductSalesSummary
-][];
-
-bestSellingProducts.sort(
-  (a, b) => b[1].quantity - a[1].quantity
-);
-
-const topProduct = bestSellingProducts[0];
-
-const bestProduct = products.find(
-  (product) => product.name === topProduct?.[0]
-);
-
-/* ============================
-        BEST CUSTOMER
-============================ */
 
 type CustomerSalesSummary = {
   total: number;
   orders: number;
 };
 
-const customerSales: Record<string, CustomerSalesSummary> = {};
+export default function DashboardPage() {
+  /* ============================
+        DATABASE STATES
+  ============================ */
 
-sales.forEach((sale) => {
+  const [sales, setSales] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [debtors, setDebtors] = useState<any[]>([]);
 
-  const customerName =
-    sale.customer_name || "Walk-in Customer";
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
-  if (!customerSales[customerName]) {
+  const [loading, setLoading] = useState(true);
 
-    customerSales[customerName] = {
-      total: 0,
-      orders: 0,
-    };
+  /* ============================
+        FETCH DASHBOARD
+  ============================ */
 
+  async function fetchDashboard() {
+    try {
+      const [
+        salesRes,
+        productRes,
+        inventoryRes,
+        expenseRes,
+        ordersRes,
+        debtorRes,
+      ] = await Promise.all([
+        supabase.from("sales").select("*"),
+
+        supabase.from("products").select("*"),
+
+        supabase.from("inventory").select("*"),
+
+        supabase.from("expenses").select("*"),
+
+        supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(10),
+
+        supabase.from("debtors").select("*"),
+      ]);
+
+      if (salesRes.error) {
+        console.error("Sales fetch error:", salesRes.error);
+      }
+
+      if (productRes.error) {
+        console.error("Products fetch error:", productRes.error);
+      }
+
+      if (inventoryRes.error) {
+        console.error("Inventory fetch error:", inventoryRes.error);
+      }
+
+      if (expenseRes.error) {
+        console.error("Expenses fetch error:", expenseRes.error);
+      }
+
+      if (ordersRes.error) {
+        console.error("Orders fetch error:", ordersRes.error);
+      }
+
+      if (debtorRes.error) {
+        console.error("Debtors fetch error:", debtorRes.error);
+      }
+
+      setSales(salesRes.data || []);
+      setProducts(productRes.data || []);
+      setInventory(inventoryRes.data || []);
+      setExpenses(expenseRes.data || []);
+      setRecentOrders(ordersRes.data || []);
+      setDebtors(debtorRes.data || []);
+    } catch (error) {
+      console.error("Dashboard fetch error:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  customerSales[customerName].total += Number(
-    sale.total_amount || 0
+  /* ============================
+        INITIAL LOAD
+  ============================ */
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  /* ============================
+        REALTIME AUTO REFRESH
+  ============================ */
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("dashboard-realtime")
+
+      /* SALES */
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "sales",
+        },
+        (payload) => {
+          console.log("Realtime sales update:", payload);
+          fetchDashboard();
+        }
+      )
+
+      /* PRODUCTS */
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "products",
+        },
+        (payload) => {
+          console.log("Realtime products update:", payload);
+          fetchDashboard();
+        }
+      )
+
+      /* INVENTORY */
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "inventory",
+        },
+        (payload) => {
+          console.log("Realtime inventory update:", payload);
+          fetchDashboard();
+        }
+      )
+
+      /* EXPENSES */
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "expenses",
+        },
+        (payload) => {
+          console.log("Realtime expenses update:", payload);
+          fetchDashboard();
+        }
+      )
+
+      /* DEBTORS */
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "debtors",
+        },
+        (payload) => {
+          console.log("Realtime debtor update:", payload);
+          fetchDashboard();
+        }
+      )
+
+      /* CUSTOMER ORDERS */
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        (payload) => {
+          console.log("Realtime order update:", payload);
+          fetchDashboard();
+        }
+      )
+
+      .subscribe((status) => {
+        console.log("Dashboard realtime status:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  /* ============================
+        KPI CALCULATIONS
+  ============================ */
+
+  const revenue = sales.reduce(
+    (sum, sale) => sum + Number(sale.total_amount || 0),
+    0
   );
 
-  customerSales[customerName].orders += 1;
+  const totalExpenses = expenses.reduce(
+    (sum, expense) => sum + Number(expense.amount || 0),
+    0
+  );
 
-});
+  const totalDebts = debtors.reduce(
+    (sum, debtor) => sum + Number(debtor.balance || 0),
+    0
+  );
 
-const bestCustomers = Object.entries(customerSales) as [
-  string,
-  CustomerSalesSummary
-][];
+  const flour = inventory.find((item) =>
+    item.name?.toLowerCase().includes("flour")
+  );
 
-bestCustomers.sort(
-  (a, b) => b[1].total - a[1].total
-);
+  const flourBags = Number(flour?.quantity || 0);
 
-const topCustomer = bestCustomers[0];
-const averageOrderValue = topCustomer
-  ? topCustomer[1].total / topCustomer[1].orders
-  : 0;
+  /* ============================
+        REVENUE GRAPH
+  ============================ */
 
-if (loading) {
+  const revenueChart = Object.values(
+    sales.reduce((acc: any, sale: any) => {
+      const day = new Date(sale.created_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      });
+
+      if (!acc[day]) {
+        acc[day] = {
+          day,
+          sales: 0,
+        };
+      }
+
+      acc[day].sales += Number(sale.total_amount || 0);
+
+      return acc;
+    }, {})
+  );
+
+  /* ============================
+        PRODUCT STOCK PIE
+  ============================ */
+
+  const stockChart = products
+    .filter((product) => Number(product.stock) > 0)
+    .map((product) => ({
+      name: product.name,
+      value: Number(product.stock),
+    }));
+
+  /* ============================
+        BEST SELLING PRODUCT
+  ============================ */
+
+  const productSales: Record<string, ProductSalesSummary> = {};
+
+  sales.forEach((sale) => {
+    const productName = sale.product_name;
+
+    if (!productName) return;
+
+    if (!productSales[productName]) {
+      productSales[productName] = {
+        quantity: 0,
+        revenue: 0,
+      };
+    }
+
+    productSales[productName].quantity += Number(sale.quantity || 0);
+
+    productSales[productName].revenue += Number(sale.total_amount || 0);
+  });
+
+  const bestSellingProducts = Object.entries(productSales) as [
+    string,
+    ProductSalesSummary
+  ][];
+
+  bestSellingProducts.sort((a, b) => b[1].quantity - a[1].quantity);
+
+  const topProduct = bestSellingProducts[0];
+
+  const bestProduct = products.find(
+    (product) => product.name === topProduct?.[0]
+  );
+
+  /* ============================
+        BEST CUSTOMER
+  ============================ */
+
+  const customerSales: Record<string, CustomerSalesSummary> = {};
+
+  sales.forEach((sale) => {
+    const customerName = sale.customer_name || "Walk-in Customer";
+
+    if (!customerSales[customerName]) {
+      customerSales[customerName] = {
+        total: 0,
+        orders: 0,
+      };
+    }
+
+    customerSales[customerName].total += Number(sale.total_amount || 0);
+
+    customerSales[customerName].orders += 1;
+  });
+
+  const bestCustomers = Object.entries(customerSales) as [
+    string,
+    CustomerSalesSummary
+  ][];
+
+  bestCustomers.sort((a, b) => b[1].total - a[1].total);
+
+  const topCustomer = bestCustomers[0];
+
+  const averageOrderValue = topCustomer
+    ? topCustomer[1].total / topCustomer[1].orders
+    : 0;
+
+  /* ============================
+        LOADING
+  ============================ */
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#08111f]">
+        <h2 className="text-white text-2xl font-bold">
+          Loading Dashboard...
+        </h2>
+      </div>
+    );
+  }
+
+  /* ============================
+        DASHBOARD
+  ============================ */
 
   return (
+    <div className="min-h-screen bg-[#08111f] -m-6 p-8">
 
-    <div className="min-h-screen flex items-center justify-center bg-[#08111f]">
-
-      <h2 className="text-white text-2xl font-bold">
-
-        Loading Dashboard...
-
-      </h2>
-
-    </div>
-
-  );
-
-}
-
-return (
-
-<div className="min-h-screen bg-[#08111f] -m-6 p-8">
-
-      {/* ==========================================
-                EXECUTIVE HEADER
-      ========================================== */}
+      {/* ============================
+            EXECUTIVE HEADER
+      ============================ */}
 
       <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-8 mb-10">
 
@@ -390,33 +408,25 @@ return (
           />
 
           <div>
-
-<div>
-
-  <p className="text-blue-400 text-lg font-semibold">
-    👋 Good Evening,
-  </p>
-
-  <h1 className="text-5xl font-black text-white mt-2">
-    Chika
-  </h1>
-
-  <p className="text-slate-400 mt-2 text-lg">
-    Chief Executive Officer
-  </p>
-
-  <p className="text-slate-500 mt-1">
-    NKIRUKA / IRUKA INDUSTRIES LTD
-  </p>
-
-</div>
-
-            <p className="text-slate-500 mt-1">
-
-              Real-time Business Intelligence
-
+            <p className="text-blue-400 text-lg font-semibold">
+              👋 Good Evening,
             </p>
 
+            <h1 className="text-5xl font-black text-white mt-2">
+              Chika
+            </h1>
+
+            <p className="text-slate-400 mt-2 text-lg">
+              Chief Executive Officer
+            </p>
+
+            <p className="text-slate-500 mt-1">
+              NKIRUKA / IRUKA INDUSTRIES LTD
+            </p>
+
+            <p className="text-slate-500 mt-1">
+              Real-time Business Intelligence
+            </p>
           </div>
 
         </div>
@@ -424,42 +434,33 @@ return (
         <div className="bg-slate-900 border border-slate-700 rounded-3xl px-8 py-6 shadow-2xl">
 
           <p className="text-slate-400">
-
             Today
-
           </p>
 
           <h2 className="text-white text-2xl font-bold mt-1">
-
-            {new Date().toLocaleDateString(
-              "en-GB",
-              {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              }
-            )}
-
+            {new Date().toLocaleDateString("en-GB", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
           </h2>
 
           <p className="text-yellow-400 mt-2 font-semibold">
-
             CEO Analytics Center
-
           </p>
 
         </div>
 
       </div>
 
-      {/* ==========================================
-                  KPI CARDS
-      ========================================== */}
+      {/* ============================
+            KPI CARDS
+      ============================ */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
 
-        {/* Revenue */}
+        {/* REVENUE */}
 
         <div className="bg-gradient-to-br from-green-900 to-slate-900 rounded-3xl border border-green-700 shadow-2xl p-7">
 
@@ -468,21 +469,15 @@ return (
             <div>
 
               <p className="text-green-300">
-
                 Total Revenue
-
               </p>
 
               <h2 className="text-4xl font-black text-white mt-4">
-
                 ₦{revenue.toLocaleString()}
-
               </h2>
 
               <p className="text-green-200 mt-3">
-
                 Sales Recorded
-
               </p>
 
             </div>
@@ -499,14 +494,12 @@ return (
           </div>
 
           <div className="mt-6 text-sm text-green-300">
-
             {sales.length} Transactions
-
           </div>
 
         </div>
 
-        {/* Expenses */}
+        {/* EXPENSES */}
 
         <div className="bg-gradient-to-br from-blue-900 to-slate-900 rounded-3xl border border-blue-700 shadow-2xl p-7">
 
@@ -515,21 +508,15 @@ return (
             <div>
 
               <p className="text-blue-300">
-
                 Expenses
-
               </p>
 
               <h2 className="text-4xl font-black text-white mt-4">
-
                 ₦{totalExpenses.toLocaleString()}
-
               </h2>
 
               <p className="text-blue-200 mt-3">
-
                 Total Expenses
-
               </p>
 
             </div>
@@ -546,14 +533,12 @@ return (
           </div>
 
           <div className="mt-6 text-sm text-blue-300">
-
             {expenses.length} Expense Records
-
           </div>
 
         </div>
 
-        {/* Debtors */}
+        {/* DEBTORS */}
 
         <div className="bg-gradient-to-br from-yellow-900 to-slate-900 rounded-3xl border border-yellow-700 shadow-2xl p-7">
 
@@ -562,21 +547,15 @@ return (
             <div>
 
               <p className="text-yellow-300">
-
                 Outstanding Debts
-
               </p>
 
               <h2 className="text-4xl font-black text-white mt-4">
-
                 ₦{totalDebts.toLocaleString()}
-
               </h2>
 
               <p className="text-yellow-200 mt-3">
-
                 Money Yet To Be Collected
-
               </p>
 
             </div>
@@ -593,14 +572,12 @@ return (
           </div>
 
           <div className="mt-6 text-sm text-yellow-300">
-
             {debtors.length} Active Debtors
-
           </div>
 
         </div>
 
-        {/* Flour */}
+        {/* FLOUR */}
 
         <div className="bg-gradient-to-br from-red-900 to-slate-900 rounded-3xl border border-red-700 shadow-2xl p-7">
 
@@ -609,21 +586,15 @@ return (
             <div>
 
               <p className="text-red-300">
-
                 Flour Remaining
-
               </p>
 
               <h2 className="text-4xl font-black text-white mt-4">
-
                 {flourBags.toLocaleString()} Bags
-
               </h2>
 
               <p className="text-red-200 mt-3">
-
                 Current Flour Inventory
-
               </p>
 
             </div>
@@ -667,292 +638,283 @@ return (
 
       </div>
 
-      {/* ==========================================
-             ANALYTICS SECTION STARTS HERE
-      ========================================== */}
-
-            {/* ==========================================
-                ANALYTICS SECTION
-      ========================================== */}
+      {/* ============================
+            ANALYTICS
+      ============================ */}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-10">
 
-{/* ==========================================
-        Revenue Analytics
-========================================== */}
+        {/* REVENUE ANALYTICS */}
 
-<div className="xl:col-span-5 bg-slate-900 border border-slate-700 rounded-3xl p-5 shadow-2xl">
+        <div className="xl:col-span-5 bg-slate-900 border border-slate-700 rounded-3xl p-5 shadow-2xl">
 
-  <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-8">
 
-    <div>
+            <div>
 
-      <h2 className="text-3xl font-bold text-white">
-        Revenue Analytics
-      </h2>
+              <h2 className="text-3xl font-bold text-white">
+                Revenue Analytics
+              </h2>
 
-      <p className="text-slate-400 mt-2">
-        Live Revenue Performance
-      </p>
+              <p className="text-slate-400 mt-2">
+                Live Revenue Performance
+              </p>
 
-    </div>
+            </div>
 
-    <div className="rounded-xl bg-blue-600 px-5 py-3 text-white font-semibold">
-      {revenueChart.length} Days
-    </div>
-
-  </div>
-
-  <div className="h-[220px]">
-
-    <ResponsiveContainer width="100%" height="100%">
-
-      <AreaChart data={revenueChart}>
-
-        <defs>
-
-          <linearGradient
-            id="revenueGradient"
-            x1="0"
-            y1="0"
-            x2="0"
-            y2="1"
-          >
-
-            <stop
-              offset="5%"
-              stopColor="#3B82F6"
-              stopOpacity={0.8}
-            />
-
-            <stop
-              offset="95%"
-              stopColor="#3B82F6"
-              stopOpacity={0.05}
-            />
-
-          </linearGradient>
-
-        </defs>
-
-        <CartesianGrid
-          stroke="#334155"
-          strokeDasharray="4 4"
-        />
-
-        <XAxis
-          dataKey="day"
-          stroke="#94A3B8"
-        />
-
-        <YAxis
-          stroke="#94A3B8"
-        />
-
-        <Tooltip
-          contentStyle={{
-            background: "#0F172A",
-            border: "1px solid #334155",
-            borderRadius: "14px",
-            color: "#fff",
-          }}
-        />
-
-        <Area
-          type="monotone"
-          dataKey="sales"
-          stroke="#3B82F6"
-          strokeWidth={4}
-          fill="url(#revenueGradient)"
-        />
-
-      </AreaChart>
-
-    </ResponsiveContainer>
-
-  </div>
-
-  <div className="grid grid-cols-3 gap-5 mt-4">
-
-    <div className="rounded-2xl bg-[#0F172A] p-5">
-
-      <p className="text-slate-400 text-sm">
-        Today's Revenue
-      </p>
-
-      <h2 className="mt-2 text-3xl font-bold text-green-400">
-        ₦{revenue.toLocaleString()}
-      </h2>
-
-    </div>
-
-    <div className="rounded-2xl bg-[#0F172A] p-4">
-
-      <p className="text-slate-400 text-sm">
-        Sales Transactions
-      </p>
-
-      <h2 className="mt-2 text-3xl font-bold text-blue-400">
-        {sales.length}
-      </h2>
-
-    </div>
-
-    <div className="rounded-2xl bg-[#0F172A] p-5">
-
-      <p className="text-slate-400 text-sm">
-        Average Sale
-      </p>
-
-      <h2 className="mt-2 text-3xl font-bold text-yellow-400">
-        ₦
-        {sales.length > 0
-          ? Math.round(revenue / sales.length).toLocaleString()
-          : "0"}
-      </h2>
-
-    </div>
-
-  </div>
-
-</div>
-
-{/* ==========================================
-        Product Stock
-========================================== */}
-
-<div className="xl:col-span-4 rounded-3xl bg-[#111C44] border border-slate-700 p-8 shadow-2xl">
-
-  <div className="flex justify-between items-center mb-6">
-
-    <div>
-
-      <h2 className="text-3xl font-bold text-white">
-        Product Stock
-      </h2>
-
-      <p className="text-slate-400 mt-2">
-        Current Inventory Distribution
-      </p>
-
-    </div>
-
-  </div>
-
-  <div className="h-[170px]">
-
-    <ResponsiveContainer width="100%" height="100%">
-
-      <PieChart>
-
-        <Pie
-          data={stockChart}
-          dataKey="value"
-          nameKey="name"
-          innerRadius={70}
-          outerRadius={105}
-          paddingAngle={4}
-        >
-
-          {stockChart.map((entry, index) => (
-
-            <Cell
-              key={index}
-              fill={COLORS[index % COLORS.length]}
-            />
-
-          ))}
-
-        </Pie>
-
-        <Tooltip />
-
-      </PieChart>
-
-    </ResponsiveContainer>
-
-  </div>
-
-  <div className="grid grid-cols-2 gap-4 mt-6">
-
-    <div className="rounded-2xl bg-[#0F172A] p-5">
-
-      <p className="text-slate-400 text-sm">
-        Products
-      </p>
-
-      <h2 className="text-3xl font-bold text-blue-400 mt-2">
-        {products.length}
-      </h2>
-
-    </div>
-
-    <div className="rounded-2xl bg-[#0F172A] p-5">
-
-      <p className="text-slate-400 text-sm">
-        Total Stock
-      </p>
-
-      <h2 className="text-3xl font-bold text-green-400 mt-2">
-        {products.reduce(
-          (sum, p) => sum + Number(p.stock || 0),
-          0
-        )}
-      </h2>
-
-    </div>
-
-  </div>
-
-  <div className="mt-3 space-y-2">
-
-    {stockChart
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
-      .map((item, index) => (
-
-        <div
-          key={index}
-          className="flex justify-between items-center rounded-xl bg-[#0F172A] px-4 py-2"
-        >
-
-          <div className="flex items-center gap-3">
-
-            <div
-              className="h-3 w-3 rounded-full"
-              style={{
-                background:
-                  COLORS[index % COLORS.length],
-              }}
-            />
-
-            <span className="text-white font-medium">
-              {item.name}
-            </span>
+            <div className="rounded-xl bg-blue-600 px-5 py-3 text-white font-semibold">
+              {revenueChart.length} Days
+            </div>
 
           </div>
 
-          <span className="text-blue-400 font-bold">
-            {item.value}
-          </span>
+          <div className="h-[220px]">
+
+            <ResponsiveContainer width="100%" height="100%">
+
+              <AreaChart data={revenueChart}>
+
+                <defs>
+
+                  <linearGradient
+                    id="revenueGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+
+                    <stop
+                      offset="5%"
+                      stopColor="#3B82F6"
+                      stopOpacity={0.8}
+                    />
+
+                    <stop
+                      offset="95%"
+                      stopColor="#3B82F6"
+                      stopOpacity={0.05}
+                    />
+
+                  </linearGradient>
+
+                </defs>
+
+                <CartesianGrid
+                  stroke="#334155"
+                  strokeDasharray="4 4"
+                />
+
+                <XAxis
+                  dataKey="day"
+                  stroke="#94A3B8"
+                />
+
+                <YAxis
+                  stroke="#94A3B8"
+                />
+
+                <Tooltip
+                  contentStyle={{
+                    background: "#0F172A",
+                    border: "1px solid #334155",
+                    borderRadius: "14px",
+                    color: "#fff",
+                  }}
+                />
+
+                <Area
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="#3B82F6"
+                  strokeWidth={4}
+                  fill="url(#revenueGradient)"
+                />
+
+              </AreaChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
+          <div className="grid grid-cols-3 gap-5 mt-4">
+
+            <div className="rounded-2xl bg-[#0F172A] p-5">
+
+              <p className="text-slate-400 text-sm">
+                Total Revenue
+              </p>
+
+              <h2 className="mt-2 text-3xl font-bold text-green-400">
+                ₦{revenue.toLocaleString()}
+              </h2>
+
+            </div>
+
+            <div className="rounded-2xl bg-[#0F172A] p-4">
+
+              <p className="text-slate-400 text-sm">
+                Sales Transactions
+              </p>
+
+              <h2 className="mt-2 text-3xl font-bold text-blue-400">
+                {sales.length}
+              </h2>
+
+            </div>
+
+            <div className="rounded-2xl bg-[#0F172A] p-5">
+
+              <p className="text-slate-400 text-sm">
+                Average Sale
+              </p>
+
+              <h2 className="mt-2 text-3xl font-bold text-yellow-400">
+
+                ₦
+                {sales.length > 0
+                  ? Math.round(
+                      revenue / sales.length
+                    ).toLocaleString()
+                  : "0"}
+
+              </h2>
+
+            </div>
+
+          </div>
 
         </div>
 
-      ))}
+        {/* PRODUCT STOCK */}
 
-  </div>
+        <div className="xl:col-span-4 rounded-3xl bg-[#111C44] border border-slate-700 p-8 shadow-2xl">
 
-</div>
+          <div className="mb-6">
 
-        {/* ==========================================
-                RIGHT SIDE
-        ========================================== */}
+            <h2 className="text-3xl font-bold text-white">
+              Product Stock
+            </h2>
+
+            <p className="text-slate-400 mt-2">
+              Current Inventory Distribution
+            </p>
+
+          </div>
+
+          <div className="h-[170px]">
+
+            <ResponsiveContainer width="100%" height="100%">
+
+              <PieChart>
+
+                <Pie
+                  data={stockChart}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={70}
+                  outerRadius={105}
+                  paddingAngle={4}
+                >
+
+                  {stockChart.map((entry, index) => (
+
+                    <Cell
+                      key={index}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+
+                  ))}
+
+                </Pie>
+
+                <Tooltip />
+
+              </PieChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-6">
+
+            <div className="rounded-2xl bg-[#0F172A] p-5">
+
+              <p className="text-slate-400 text-sm">
+                Products
+              </p>
+
+              <h2 className="text-3xl font-bold text-blue-400 mt-2">
+                {products.length}
+              </h2>
+
+            </div>
+
+            <div className="rounded-2xl bg-[#0F172A] p-5">
+
+              <p className="text-slate-400 text-sm">
+                Total Stock
+              </p>
+
+              <h2 className="text-3xl font-bold text-green-400 mt-2">
+
+                {products.reduce(
+                  (sum, p) =>
+                    sum + Number(p.stock || 0),
+                  0
+                )}
+
+              </h2>
+
+            </div>
+
+          </div>
+
+          <div className="mt-3 space-y-2">
+
+            {[...stockChart]
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 5)
+              .map((item, index) => (
+
+                <div
+                  key={index}
+                  className="flex justify-between items-center rounded-xl bg-[#0F172A] px-4 py-2"
+                >
+
+                  <div className="flex items-center gap-3">
+
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{
+                        background:
+                          COLORS[index % COLORS.length],
+                      }}
+                    />
+
+                    <span className="text-white font-medium">
+                      {item.name}
+                    </span>
+
+                  </div>
+
+                  <span className="text-blue-400 font-bold">
+                    {item.value}
+                  </span>
+
+                </div>
+
+              ))}
+
+          </div>
+
+        </div>
+
+        {/* RIGHT SIDE */}
 
         <div className="xl:col-span-3 flex flex-col gap-6">
 
-          {/* ==========================================
-                  Best Selling Product
-          ========================================== */}
+          {/* BEST PRODUCT */}
 
           <div className="bg-slate-900 border border-yellow-600 rounded-3xl p-6 shadow-2xl">
 
@@ -964,9 +926,7 @@ return (
               />
 
               <h2 className="text-xl font-bold text-white">
-
                 Best Selling Product
-
               </h2>
 
             </div>
@@ -976,16 +936,12 @@ return (
               <div className="w-24 h-24 rounded-2xl bg-slate-800 overflow-hidden flex items-center justify-center">
 
                 <img
-
                   src={
                     bestProduct?.image_url ||
                     "/placeholder.png"
                   }
-
-                  alt={bestProduct?.name}
-
+                  alt={bestProduct?.name || "Product"}
                   className="w-20 h-20 object-contain"
-
                 />
 
               </div>
@@ -993,73 +949,65 @@ return (
               <div>
 
                 <h3 className="text-2xl font-bold text-white">
-
                   {bestProduct?.name || "No Sales"}
-
                 </h3>
 
                 <p className="text-green-400 mt-2">
-
                   #1 Best Seller
-
                 </p>
 
-<p className="text-slate-400 mt-4">
+                <p className="text-slate-400 mt-4">
+                  Units Sold
+                </p>
 
-  Units Sold
+                <h2 className="text-3xl font-black text-white">
+                  {topProduct
+                    ? topProduct[1].quantity
+                    : 0}
+                </h2>
 
-</p>
+                <div className="mt-5 border-t border-slate-700 pt-4">
 
-<h2 className="text-3xl font-black text-white">
+                  <div className="flex justify-between">
 
-  {topProduct ? topProduct[1].quantity : 0}
+                    <span className="text-slate-400">
+                      Revenue
+                    </span>
 
-</h2>
+                    <span className="text-green-400 font-bold">
 
-<div className="mt-5 border-t border-slate-700 pt-4">
+                      ₦
+                      {topProduct
+                        ? Number(
+                            topProduct[1].revenue
+                          ).toLocaleString()
+                        : "0"}
 
-  <div className="flex justify-between">
+                    </span>
 
-    <span className="text-slate-400">
+                  </div>
 
-      Revenue
+                  <div className="flex justify-between mt-3">
 
-    </span>
+                    <span className="text-slate-400">
+                      Avg Price
+                    </span>
 
-    <span className="text-green-400 font-bold">
+                    <span className="text-blue-400 font-bold">
 
-      ₦{topProduct
-        ? Number(
-            topProduct[1].revenue
-          ).toLocaleString()
-        : "0"}
+                      ₦
+                      {topProduct
+                        ? Math.round(
+                            topProduct[1].revenue /
+                              topProduct[1].quantity
+                          ).toLocaleString()
+                        : "0"}
 
-    </span>
+                    </span>
 
-  </div>
+                  </div>
 
-  <div className="flex justify-between mt-3">
-
-    <span className="text-slate-400">
-
-      Avg Price
-
-    </span>
-
-    <span className="text-blue-400 font-bold">
-
-      ₦{topProduct
-        ? Math.round(
-            topProduct[1].revenue /
-            topProduct[1].quantity
-          ).toLocaleString()
-        : "0"}
-
-    </span>
-
-  </div>
-
-</div>
+                </div>
 
               </div>
 
@@ -1067,9 +1015,7 @@ return (
 
           </div>
 
-          {/* ==========================================
-                    Best Customer
-          ========================================== */}
+          {/* BEST CUSTOMER */}
 
           <div className="bg-slate-900 border border-purple-700 rounded-3xl p-6 shadow-2xl">
 
@@ -1081,9 +1027,7 @@ return (
               />
 
               <h2 className="text-xl font-bold text-white">
-
                 Best Customer
-
               </h2>
 
             </div>
@@ -1101,63 +1045,60 @@ return (
 
               <div>
 
-<h3 className="text-xl font-bold text-white">
-
-  {topCustomer?.[0] ?? "No Customer"}
-
-</h3>
+                <h3 className="text-xl font-bold text-white">
+                  {topCustomer?.[0] ?? "No Customer"}
+                </h3>
 
                 <p className="text-purple-300 mt-2">
-
                   Top Customer
-
                 </p>
 
-<h2 className="text-2xl font-black text-white mt-3">
+                <h2 className="text-2xl font-black text-white mt-3">
 
-₦{topCustomer
-  ? Number(topCustomer[1].total).toLocaleString()
-  : "0"}
+                  ₦
+                  {topCustomer
+                    ? Number(
+                        topCustomer[1].total
+                      ).toLocaleString()
+                    : "0"}
 
-</h2>
+                </h2>
 
-<div className="mt-4 border-t border-slate-700 pt-4">
+                <div className="mt-4 border-t border-slate-700 pt-4">
 
-  <div className="flex justify-between">
+                  <div className="flex justify-between">
 
-    <span className="text-slate-400">
+                    <span className="text-slate-400">
+                      Orders
+                    </span>
 
-      Orders
+                    <span className="text-white font-bold">
+                      {topCustomer?.[1].orders ?? 0}
+                    </span>
 
-    </span>
+                  </div>
 
-    <span className="text-white font-bold">
+                  <div className="flex justify-between mt-3">
 
-      {topCustomer?.[1].orders ?? 0}
+                    <span className="text-slate-400">
+                      Avg Order
+                    </span>
 
-    </span>
+                    <span className="text-green-400 font-bold">
 
-  </div>
+                      ₦
+                      {averageOrderValue.toLocaleString(
+                        undefined,
+                        {
+                          maximumFractionDigits: 0,
+                        }
+                      )}
 
-  <div className="flex justify-between mt-3">
+                    </span>
 
-    <span className="text-slate-400">
+                  </div>
 
-      Avg Order
-
-    </span>
-
-    <span className="text-green-400 font-bold">
-
-      ₦{averageOrderValue.toLocaleString(undefined,{
-        maximumFractionDigits:0,
-      })}
-
-    </span>
-
-  </div>
-
-</div>
+                </div>
 
               </div>
 
@@ -1169,13 +1110,9 @@ return (
 
       </div>
 
-      {/* ==========================================
-            PRODUCT INVENTORY STARTS HERE
-      ========================================== */}
-
-            {/* ==========================================
-                PRODUCT INVENTORY
-      ========================================== */}
+      {/* ============================
+            PRODUCT INVENTORY
+      ============================ */}
 
       <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-8 mb-10">
 
@@ -1184,15 +1121,11 @@ return (
           <div>
 
             <h2 className="text-3xl font-bold text-white">
-
               Product Inventory
-
             </h2>
 
             <p className="text-slate-400 mt-2">
-
               Live Finished Goods Inventory
-
             </p>
 
           </div>
@@ -1200,9 +1133,7 @@ return (
           <div className="bg-blue-600 px-5 py-3 rounded-xl">
 
             <span className="text-white font-semibold">
-
               {products.length} Products
-
             </span>
 
           </div>
@@ -1214,15 +1145,11 @@ return (
           <div className="text-center py-20">
 
             <h2 className="text-white text-2xl font-bold">
-
               No Products Found
-
             </h2>
 
             <p className="text-slate-400 mt-3">
-
               Add products from the Products module.
-
             </p>
 
           </div>
@@ -1236,103 +1163,56 @@ return (
               const stock = Number(product.stock || 0);
 
               const percentage = Math.min(
-
                 (stock / 5000) * 100,
-
                 100
-
               );
 
               return (
 
                 <div
-
                   key={product.id}
-
                   className="bg-[#111c2d] border border-slate-700 rounded-3xl overflow-hidden hover:border-blue-500 transition duration-300 hover:-translate-y-2"
-
                 >
-
-                  {/* Product Image */}
 
                   <div className="bg-slate-800 h-44 flex items-center justify-center">
 
                     <img
-
                       src={
-
                         product.image_url ||
-
                         "/placeholder.png"
-
                       }
-
                       alt={product.name}
-
                       className="h-32 object-contain"
-
                     />
 
                   </div>
 
-                  {/* Product Details */}
-
                   <div className="p-5">
 
                     <h3 className="text-xl font-bold text-white">
-
                       {product.name}
-
                     </h3>
 
                     <p className="text-slate-400 text-sm mt-1">
-
-                      SKU:
-
-                      {" "}
-
-                      {product.sku || "N/A"}
-
+                      SKU: {product.sku || "N/A"}
                     </p>
 
                     <div className="mt-5">
 
                       <span
-
-                        className={`px-3 py-1 rounded-full text-xs font-semibold
-
-                        ${
-
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           stock > 300
-
                             ? "bg-green-600/20 text-green-400"
-
                             : stock > 100
-
                             ? "bg-yellow-600/20 text-yellow-400"
-
                             : "bg-red-600/20 text-red-400"
-
-                        }
-
-                        `}
-
+                        }`}
                       >
-
-                        {
-
-                          stock > 300
-
-                            ? "In Stock"
-
-                            : stock > 100
-
-                            ? "Running Low"
-
-                            : "Critical"
-
-                        }
-
+                        {stock > 300
+                          ? "In Stock"
+                          : stock > 100
+                          ? "Running Low"
+                          : "Critical"}
                       </span>
 
                     </div>
@@ -1340,15 +1220,11 @@ return (
                     <div className="mt-5">
 
                       <h2 className="text-4xl font-black text-white">
-
                         {stock.toLocaleString()}
-
                       </h2>
 
                       <p className="text-slate-400">
-
                         Units Available
-
                       </p>
 
                     </div>
@@ -1356,93 +1232,72 @@ return (
                     <div className="mt-5 flex justify-between">
 
                       <span className="text-slate-400">
-
                         Price
-
                       </span>
 
                       <span className="text-green-400 font-bold">
 
                         ₦
-
                         {Number(
-
                           product.price || 0
-
                         ).toLocaleString()}
 
                       </span>
 
                     </div>
 
-                    {/* Stock Bar */}
-
                     <div className="mt-6">
 
                       <div className="bg-slate-700 rounded-full h-2">
 
                         <div
-
-                          className={`h-2 rounded-full
-
-                          ${
-
+                          className={`h-2 rounded-full ${
                             stock > 300
-
                               ? "bg-green-500"
-
                               : stock > 100
-
                               ? "bg-yellow-500"
-
                               : "bg-red-500"
-
-                          }
-
-                          `}
-
+                          }`}
                           style={{
-
                             width: `${percentage}%`,
-
                           }}
-
                         />
 
                       </div>
 
                     </div>
 
-                    {/* Buttons */}
-<div className="mt-6 border-t border-slate-700 pt-4">
+                    <div className="mt-6 border-t border-slate-700 pt-4">
 
-  <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-sm">
 
-    <span className="text-slate-400">
+                        <span className="text-slate-400">
+                          Inventory Value
+                        </span>
 
-      Inventory Value
+                        <span className="text-green-400 font-bold">
 
-    </span>
+                          ₦
+                          {(
+                            Number(
+                              product.stock || 0
+                            ) *
+                            Number(
+                              product.price || 0
+                            )
+                          ).toLocaleString()}
 
-    <span className="text-green-400 font-bold">
+                        </span>
 
-      ₦{(
-        Number(product.stock || 0) *
-        Number(product.price || 0)
-      ).toLocaleString()}
+                      </div>
 
-    </span>
-
-  </div>
-
-</div>
+                    </div>
 
                   </div>
 
                 </div>
 
               );
-
             })}
 
           </div>
@@ -1451,289 +1306,298 @@ return (
 
       </div>
 
-      {/* ==========================================
-            RECENT SALES STARTS HERE
-      ========================================== */}
-
-{/* ==========================================
+      {/* ============================
             RECENT CUSTOMER ORDERS
-========================================== */}
+      ============================ */}
 
-<div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-8">
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-8">
 
-  <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8">
 
-    <div>
+          <div>
 
-      <h2 className="text-3xl font-bold text-white">
-        Recent Customer Orders
-      </h2>
+            <h2 className="text-3xl font-bold text-white">
+              Recent Customer Orders
+            </h2>
 
-      <p className="text-slate-400 mt-2">
-        Latest 10 Orders From The Mobile App
-      </p>
+            <p className="text-slate-400 mt-2">
+              Latest 10 Orders From The Mobile App
+            </p>
 
-    </div>
+          </div>
 
-    <div className="bg-slate-800 px-5 py-3 rounded-xl">
+          <div className="bg-slate-800 px-5 py-3 rounded-xl">
 
-      <span className="text-white font-semibold">
+            <span className="text-white font-semibold">
+              {recentOrders.length} Orders
+            </span>
 
-        {recentOrders.length} Orders
+          </div>
 
-      </span>
+        </div>
 
-    </div>
+        {recentOrders.length === 0 ? (
 
-  </div>
+          <div className="py-24 text-center">
 
-  {recentOrders.length === 0 ? (
+            <DollarSign
+              className="mx-auto text-slate-600"
+              size={60}
+            />
 
-    <div className="py-24 text-center">
+            <h2 className="text-white text-2xl font-bold mt-5">
+              No Customer Orders
+            </h2>
 
-      <DollarSign
-        className="mx-auto text-slate-600"
-        size={60}
-      />
+            <p className="text-slate-400 mt-2">
+              Orders from customers will automatically appear here.
+            </p>
 
-      <h2 className="text-white text-2xl font-bold mt-5">
+          </div>
 
-        No Customer Orders
+        ) : (
 
-      </h2>
+          <div className="overflow-x-auto">
 
-      <p className="text-slate-400 mt-2">
+            <table className="w-full">
 
-        Orders from customers will automatically appear here.
+              <thead>
 
-      </p>
+                <tr className="border-b border-slate-700">
 
-    </div>
+                  <th className="text-left py-4 text-slate-400">
+                    Customer
+                  </th>
 
-  ) : (
+                  <th className="text-left py-4 text-slate-400">
+                    Order No.
+                  </th>
 
-    <div className="overflow-x-auto">
+                  <th className="text-center py-4 text-slate-400">
+                    Status
+                  </th>
 
-      <table className="w-full">
+                  <th className="text-right py-4 text-slate-400">
+                    Total
+                  </th>
 
-        <thead>
+                  <th className="text-center py-4 text-slate-400">
+                    Date
+                  </th>
 
-          <tr className="border-b border-slate-700">
+                  <th className="text-center py-4 text-slate-400">
+                    Action
+                  </th>
 
-            <th className="text-left py-4 text-slate-400">
+                </tr>
 
-              Customer
+              </thead>
 
-            </th>
+              <tbody>
 
-            <th className="text-left py-4 text-slate-400">
+                {recentOrders.map((order) => (
 
-              Order No.
+                  <tr
+                    key={order.id}
+                    className="border-b border-slate-800 hover:bg-slate-800 transition"
+                  >
 
-            </th>
+                    <td className="py-5">
 
-            <th className="text-center py-4 text-slate-400">
+                      <div className="flex items-center gap-3">
 
-              Status
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-bold">
 
-            </th>
+                          {(order.customer_name || "C").charAt(0)}
 
-            <th className="text-right py-4 text-slate-400">
+                        </div>
 
-              Total
+                        <div>
 
-            </th>
+                          <h3 className="font-semibold text-white">
+                            {order.customer_name || "Customer"}
+                          </h3>
 
-            <th className="text-center py-4 text-slate-400">
+                        </div>
 
-              Date
+                      </div>
 
-            </th>
+                    </td>
 
-            <th className="text-center py-4 text-slate-400">
+                    <td className="text-slate-300 font-medium">
+                      {order.order_number || order.id}
+                    </td>
 
-              Action
+                    <td className="text-center">
 
-            </th>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          order.status === "Completed"
+                            ? "bg-green-500/20 text-green-400"
+                            : order.status === "Pending"
+                            ? "bg-yellow-500/20 text-yellow-300"
+                            : "bg-blue-500/20 text-blue-400"
+                        }`}
+                      >
+                        {order.status || "Processing"}
+                      </span>
 
-          </tr>
+                    </td>
 
-        </thead>
+                    <td className="text-right font-bold text-green-400">
+                      ₦
+                      {Number(
+                        order.total_amount || 0
+                      ).toLocaleString()}
+                    </td>
 
-        <tbody>
+                    <td className="text-center text-slate-400">
 
-          {recentOrders.map((order) => (
+                      {order.created_at
+                        ? new Date(
+                            order.created_at
+                          ).toLocaleDateString("en-GB")
+                        : "-"}
 
-            <tr
-              key={order.id}
-              className="border-b border-slate-800 hover:bg-slate-800 transition"
-            >
+                    </td>
 
-              <td className="py-5">
+                    <td className="text-center">
 
-                <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setShowOrderModal(true);
+                        }}
+                        className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition text-white font-semibold"
+                      >
+                        View Details
+                      </button>
 
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-bold">
+                    </td>
 
-                    {(order.customer_name || "C").charAt(0)}
+                  </tr>
 
-                  </div>
+                ))}
 
-                  <div>
+              </tbody>
 
-                    <h3 className="font-semibold text-white">
+            </table>
 
-                      {order.customer_name || "Customer"}
+          </div>
 
-                    </h3>
-
-                  </div>
-
-                </div>
-
-              </td>
-
-              <td className="text-slate-300 font-medium">
-
-                {order.order_number || order.id}
-
-              </td>
-
-              <td className="text-center">
-
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    order.status === "Completed"
-                      ? "bg-green-500/20 text-green-400"
-                      : order.status === "Pending"
-                      ? "bg-yellow-500/20 text-yellow-300"
-                      : "bg-blue-500/20 text-blue-400"
-                  }`}
-                >
-
-                  {order.status || "Processing"}
-
-                </span>
-
-              </td>
-
-              <td className="text-right font-bold text-green-400">
-
-                ₦{Number(order.total_amount || 0).toLocaleString()}
-
-              </td>
-
-              <td className="text-center text-slate-400">
-
-                {new Date(order.created_at).toLocaleDateString("en-GB")}
-
-              </td>
-
-              <td className="text-center">
-
-<button
-  onClick={() => {
-    setSelectedOrder(order);
-    setShowOrderModal(true);
-  }}
-  className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition text-white font-semibold"
->
-  View Details
-</button>
-
-              </td>
-
-            </tr>
-
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
-
-</div>
-
-{/* ==========================
-      ORDER DETAILS MODAL
-========================== */}
-
-{showOrderModal && selectedOrder && (
-  <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
-
-    <div className="bg-slate-900 w-[650px] max-w-[95%] rounded-3xl border border-slate-700 p-8">
-
-      <div className="flex justify-between items-center mb-8">
-
-        <h2 className="text-3xl font-bold text-white">
-          Order Details
-        </h2>
-
-        <button
-          onClick={() => setShowOrderModal(false)}
-          className="text-slate-400 hover:text-white text-2xl"
-        >
-          ✕
-        </button>
+        )}
 
       </div>
 
-      <div className="space-y-5">
+      {/* ============================
+            ORDER DETAILS MODAL
+      ============================ */}
 
-        <div>
-          <p className="text-slate-400">Customer</p>
-          <h3 className="text-xl font-bold text-white">
-            {selectedOrder.customer_name}
-          </h3>
+      {showOrderModal && selectedOrder && (
+
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+
+          <div className="bg-slate-900 w-[650px] max-w-[95%] rounded-3xl border border-slate-700 p-8">
+
+            <div className="flex justify-between items-center mb-8">
+
+              <h2 className="text-3xl font-bold text-white">
+                Order Details
+              </h2>
+
+              <button
+                onClick={() => setShowOrderModal(false)}
+                className="text-slate-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+
+            </div>
+
+            <div className="space-y-5">
+
+              <div>
+
+                <p className="text-slate-400">
+                  Customer
+                </p>
+
+                <h3 className="text-xl font-bold text-white">
+                  {selectedOrder.customer_name || "Customer"}
+                </h3>
+
+              </div>
+
+              <div>
+
+                <p className="text-slate-400">
+                  Order Number
+                </p>
+
+                <h3 className="text-white">
+                  {selectedOrder.order_number || selectedOrder.id}
+                </h3>
+
+              </div>
+
+              <div>
+
+                <p className="text-slate-400">
+                  Total Amount
+                </p>
+
+                <h2 className="text-3xl font-black text-green-400">
+                  ₦
+                  {Number(
+                    selectedOrder.total_amount || 0
+                  ).toLocaleString()}
+                </h2>
+
+              </div>
+
+              <div>
+
+                <p className="text-slate-400">
+                  Status
+                </p>
+
+                <h3 className="text-blue-400">
+                  {selectedOrder.status || "Processing"}
+                </h3>
+
+              </div>
+
+              <div>
+
+                <p className="text-slate-400">
+                  Payment Status
+                </p>
+
+                <h3 className="text-green-400">
+                  {selectedOrder.payment_status || "Unknown"}
+                </h3>
+
+              </div>
+
+            </div>
+
+            <div className="mt-8 flex justify-end">
+
+              <button
+                onClick={() => setShowOrderModal(false)}
+                className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl text-white"
+              >
+                Close
+              </button>
+
+            </div>
+
+          </div>
+
         </div>
 
-        <div>
-          <p className="text-slate-400">Order Number</p>
-          <h3 className="text-white">
-            {selectedOrder.order_number}
-          </h3>
-        </div>
-
-        <div>
-          <p className="text-slate-400">Total Amount</p>
-          <h2 className="text-3xl font-black text-green-400">
-            ₦{Number(selectedOrder.total_amount).toLocaleString()}
-          </h2>
-        </div>
-
-        <div>
-          <p className="text-slate-400">Status</p>
-          <h3 className="text-blue-400">
-            {selectedOrder.status}
-          </h3>
-        </div>
-
-        <div>
-          <p className="text-slate-400">Payment Status</p>
-          <h3 className="text-green-400">
-            {selectedOrder.payment_status}
-          </h3>
-        </div>
-
-      </div>
-
-      <div className="mt-8 flex justify-end">
-
-        <button
-          onClick={() => setShowOrderModal(false)}
-          className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl text-white"
-        >
-          Close
-        </button>
-
-      </div>
+      )}
 
     </div>
-
-  </div>
-)}
-
-</div>
-
-);
-
+  );
 }
