@@ -43,25 +43,7 @@ const [lastUpdated, setLastUpdated] =
 
 const [description, setDescription] = useState("");
 
-{/* Description */}
 
-<div className="lg:col-span-2">
-
-  <label className="block text-sm font-semibold text-slate-300 mb-3">
-    Description
-  </label>
-
-  <textarea
-    placeholder="Add additional details about this expense..."
-    value={description}
-    onChange={(e) =>
-      setDescription(e.target.value)
-    }
-    rows={4}
-    className="w-full rounded-2xl border border-white/10 bg-[#162844] text-white px-5 py-4 placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition resize-none"
-  />
-
-</div>
 
   // ===============================
   // FINANCE SUMMARY
@@ -139,6 +121,27 @@ async function fetchFinance() {
     if (salesError) throw salesError;
 
     // ===============================
+// DEBT REPAYMENTS
+// ===============================
+
+const {
+  data: debtorPaymentsData,
+  error: debtorPaymentsError,
+} = await supabase
+  .from("debtor_payments")
+  .select("*")
+  .order("payment_date", {
+    ascending: false,
+  });
+
+if (debtorPaymentsError) {
+  throw debtorPaymentsError;
+}
+
+const allDebtorPayments =
+  debtorPaymentsData || [];
+
+    // ===============================
     // EXPENSES
     // ===============================
 
@@ -161,9 +164,15 @@ const now = new Date();
 
 let salesList = allSales;
 let expenseList = allExpenses;
+let debtorPaymentList = allDebtorPayments;
+
+// ===============================
+// FILTER BY REPORTING PERIOD
+// ===============================
 
 if (reportPeriod === "day") {
 
+  // SALES TODAY
   salesList = allSales.filter((sale) => {
 
     const date = new Date(sale.created_at);
@@ -172,11 +181,11 @@ if (reportPeriod === "day") {
       date.getDate() === now.getDate() &&
       date.getMonth() === now.getMonth() &&
       date.getFullYear() === now.getFullYear()
-
     );
 
   });
 
+  // EXPENSES TODAY
   expenseList = allExpenses.filter((expense) => {
 
     const date = new Date(expense.created_at);
@@ -185,7 +194,19 @@ if (reportPeriod === "day") {
       date.getDate() === now.getDate() &&
       date.getMonth() === now.getMonth() &&
       date.getFullYear() === now.getFullYear()
+    );
 
+  });
+
+  // DEBT REPAYMENTS TODAY
+  debtorPaymentList = allDebtorPayments.filter((payment) => {
+
+    const date = new Date(payment.payment_date);
+
+    return (
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
     );
 
   });
@@ -194,30 +215,38 @@ if (reportPeriod === "day") {
 
 else if (reportPeriod === "month") {
 
+  // SALES THIS MONTH
   salesList = allSales.filter((sale) => {
 
     const date = new Date(sale.created_at);
 
     return (
-
       date.getMonth() === now.getMonth() &&
-
       date.getFullYear() === now.getFullYear()
-
     );
 
   });
 
+  // EXPENSES THIS MONTH
   expenseList = allExpenses.filter((expense) => {
 
     const date = new Date(expense.created_at);
 
     return (
-
       date.getMonth() === now.getMonth() &&
-
       date.getFullYear() === now.getFullYear()
+    );
 
+  });
+
+  // DEBT REPAYMENTS THIS MONTH
+  debtorPaymentList = allDebtorPayments.filter((payment) => {
+
+    const date = new Date(payment.payment_date);
+
+    return (
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
     );
 
   });
@@ -226,26 +255,35 @@ else if (reportPeriod === "month") {
 
 else if (reportPeriod === "year") {
 
+  // SALES THIS YEAR
   salesList = allSales.filter((sale) => {
 
     const date = new Date(sale.created_at);
 
     return (
-
       date.getFullYear() === now.getFullYear()
-
     );
 
   });
 
+  // EXPENSES THIS YEAR
   expenseList = allExpenses.filter((expense) => {
 
     const date = new Date(expense.created_at);
 
     return (
-
       date.getFullYear() === now.getFullYear()
+    );
 
+  });
+
+  // DEBT REPAYMENTS THIS YEAR
+  debtorPaymentList = allDebtorPayments.filter((payment) => {
+
+    const date = new Date(payment.payment_date);
+
+    return (
+      date.getFullYear() === now.getFullYear()
     );
 
   });
@@ -259,14 +297,38 @@ else if (reportPeriod === "year") {
     // TOTAL REVENUE
     // ===============================
 
-    const revenue = salesList.reduce(
-      (sum, sale) =>
-        sum +
-        Number(
-          sale.total_amount || 0
-        ),
-      0
-    );
+// ===============================
+// SALES REVENUE
+// ===============================
+
+const salesRevenue = salesList.reduce(
+  (sum, sale) =>
+    sum +
+    Number(sale.total_amount || 0),
+  0
+);
+
+// ===============================
+// DEBT REPAYMENT COLLECTIONS
+// ===============================
+
+const debtRepayments = debtorPaymentList.reduce(
+  (sum, payment) =>
+    sum +
+    Number(payment.amount_paid || 0),
+  0
+);
+
+// ===============================
+// TOTAL FINANCE REVENUE
+// ===============================
+//
+// Sales + Debtor Repayments
+//
+
+const revenue =
+  salesRevenue +
+  debtRepayments;
 
     // ===============================
     // TOTAL EXPENSES
@@ -518,13 +580,58 @@ setNetProfit(profit);
           expense.created_at?.startsWith(today)
       );
 
-    const todayRevenueTotal =
-      todaySales.reduce(
-        (sum, sale) =>
-          sum +
-          Number(sale.total_amount || 0),
-        0
-      );
+// ===============================
+// TODAY DEBT REPAYMENTS
+// ===============================
+
+const todayDebtorPayments =
+  allDebtorPayments.filter((payment) => {
+
+    const paymentDate =
+      new Date(payment.payment_date);
+
+    return (
+      paymentDate.getDate() === now.getDate() &&
+      paymentDate.getMonth() === now.getMonth() &&
+      paymentDate.getFullYear() === now.getFullYear()
+    );
+
+  });
+
+// ===============================
+// TODAY DEBT REPAYMENT TOTAL
+// ===============================
+
+const todayDebtRepaymentTotal =
+  todayDebtorPayments.reduce(
+    (sum, payment) =>
+      sum +
+      Number(payment.amount_paid || 0),
+    0
+  );
+
+// ===============================
+// TODAY SALES REVENUE
+// ===============================
+
+const todaySalesRevenue =
+  todaySales.reduce(
+    (sum, sale) =>
+      sum +
+      Number(sale.total_amount || 0),
+    0
+  );
+
+// ===============================
+// TODAY TOTAL REVENUE
+// ===============================
+//
+// Sales + Debt Repayments
+//
+
+const todayRevenueTotal =
+  todaySalesRevenue +
+  todayDebtRepaymentTotal;
 
     const todayExpenseTotal =
       todayExpenseList.reduce(
@@ -1153,49 +1260,57 @@ return (
 
       </div>
 
-      {/* Category */}
+{/* Category */}
 
-      <div>
+<div>
 
-        <label className="block text-sm font-semibold text-slate-300 mb-3">
+  <label className="block text-sm font-semibold text-slate-300 mb-3">
+    Category
+  </label>
 
-          Category
+  <select
+    value={category}
+    onChange={(e) => setCategory(e.target.value)}
+    className="w-full rounded-2xl border border-white/10 bg-[#162844] text-white px-5 py-4 outline-none"
+  >
 
-        </label>
+    <option value="">Select Category</option>
 
-        <select
-          value={category}
-          onChange={(e)=>setCategory(e.target.value)}
-          className="w-full rounded-2xl border border-white/10 bg-[#162844] text-white px-5 py-4 outline-none"
-        >
+    <option>Flour Purchase</option>
+    <option>Transportation</option>
+    <option>Fuel / Diesel</option>
+    <option>Electricity</option>
+    <option>Staff Salary</option>
+    <option>Maintenance</option>
+    <option>Packaging</option>
+    <option>Office Expense</option>
+    <option>Miscellaneous</option>
 
-          <option value="">Select Category</option>
+  </select>
 
-          <option>Flour Purchase</option>
+</div>
 
-          <option>Transportation</option>
+{/* Description */}
 
-          <option>Fuel / Diesel</option>
+<div className="lg:col-span-2">
 
-          <option>Electricity</option>
+  <label className="block text-sm font-semibold text-slate-300 mb-3">
+    Description
+  </label>
 
-          <option>Staff Salary</option>
+  <textarea
+    placeholder="Add additional details about this expense..."
+    value={description}
+    onChange={(e) => setDescription(e.target.value)}
+    rows={4}
+    className="w-full rounded-2xl border border-white/10 bg-[#162844] text-white px-5 py-4 placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition resize-none"
+  />
 
-          <option>Maintenance</option>
+</div>
 
-          <option>Packaging</option>
+</div>
 
-          <option>Office Expense</option>
-
-          <option>Miscellaneous</option>
-
-        </select>
-
-      </div>
-
-    </div>
-
-    {/* Button */}
+{/* Button */}
 
     <div className="flex justify-end mt-10">
 

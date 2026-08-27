@@ -271,9 +271,9 @@ const [paymentLoading, setPaymentLoading] = useState(false);
       throw debtorUpdateError;
     }
 
-    // ==========================================
-    // RECORD DEBTOR PAYMENT
-    // ==========================================
+// ==========================================
+// RECORD DEBTOR PAYMENT
+// ==========================================
 
 const {
   error: paymentRecordError,
@@ -288,6 +288,41 @@ const {
 
 if (paymentRecordError) {
   throw paymentRecordError;
+}
+
+
+// ==========================================
+// RECORD PAYMENT IN FINANCE
+// ==========================================
+
+const {
+  error: financeError,
+} = await supabase
+  .from("finance_transactions")
+  .insert({
+    transaction_type: "Debt Repayment",
+
+    description:
+      `Debt repayment received from ${selectedDebtor.customer_name}`,
+
+    amount: amount,
+
+    category: "Debt Recovery",
+
+    reference:
+      `DEBT-${selectedDebtor.id}-${Date.now()}`,
+
+    payment_method: "Cash",
+
+    status: "Completed",
+
+    created_by:
+      localStorage.getItem("full_name") ||
+      "System",
+  });
+
+if (financeError) {
+  throw financeError;
 }
 
     // ==========================================

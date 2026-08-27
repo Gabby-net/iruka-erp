@@ -28,11 +28,11 @@ export default function RecipePreview({
   const sugarKg = batches * 12;
   const sugarBags = sugarKg / 50;
 
-  // Butter
-  // 1.35kg per batch
-  // Inventory is stored in 15kg units
-  const butterKg = batches * 1.35;
-  const butterUnits = butterKg / 15;
+// Butter
+// 1.6kg per dough batch
+// Inventory is stored in 15kg units
+const butterKg = batches * 1.6;
+const butterUnits = butterKg / 15;
 
   // Yeast
   // 1 inventory unit per batch

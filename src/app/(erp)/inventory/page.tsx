@@ -10,7 +10,6 @@ import InventoryHistory from "@/components/inventory/InventoryHistory";
 
 import InventorySummary from "@/components/inventory/InventorySummary";
 
-import IssueMaterialForm from "@/components/inventory/IssueMaterialForm";
 
 import { supabase } from "@/lib/supabase";
 
@@ -32,9 +31,6 @@ export default function InventoryPage() {
   const [quantity, setQuantity] =
     useState("");
 
-  const [issueMaterialName, setIssueMaterialName] = useState("");
-
-const [issueQuantity, setIssueQuantity] = useState("");  
 
   const [unit, setUnit] =
     useState("");  
@@ -77,63 +73,7 @@ async function fetchInventory() {
 
 }
 
- /* =========================
-   ISSUE MATERIAL
-========================== */
 
-async function issueMaterial() {
-
-  if (!issueMaterialName || !issueQuantity) {
-    alert("Select a material and quantity.");
-    return;
-  }
-
-  const item = inventory.find(
-    (i) => i.name === issueMaterialName
-  );
-
-  if (!item) {
-    alert("Material not found.");
-    return;
-  }
-
-  const currentQuantity = Number(item.quantity);
-  const quantityToIssue = Number(issueQuantity);
-
-  if (quantityToIssue > currentQuantity) {
-    alert("Insufficient stock.");
-    return;
-  }
-
-  await supabase
-    .from("inventory")
-    .update({
-      quantity: currentQuantity - quantityToIssue,
-    })
-    .eq("id", item.id);
-
-const { error } = await supabase
-  .from("inventory_transactions")
-  .insert([
-    {
-      material_name: issueMaterialName,
-      quantity_used: quantityToIssue,
-      transaction_type: "ISSUED",
-      reference: "Manual Material Issue",
-    },
-  ]);
-
-if (error) {
-  console.error(error);
-  alert(error.message);
-  return;
-}
-
-  setIssueMaterialName("");
-  setIssueQuantity("");
-
-  fetchInventory();
-}
 
 /* =========================
    ADD INVENTORY
@@ -505,13 +445,6 @@ console.log(transactions);
 
         </div>
 
-        <IssueMaterialForm
-  material={issueMaterialName}
-  setMaterial={setIssueMaterialName}
-  quantity={issueQuantity}
-  setQuantity={setIssueQuantity}
-  issueMaterial={issueMaterial}
-/>
 
         {/* INVENTORY TABLE */}
 

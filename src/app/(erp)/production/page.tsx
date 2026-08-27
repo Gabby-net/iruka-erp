@@ -311,7 +311,7 @@ const sugarNeeded =
   (batches * 12) / 50;
 
 const butterNeeded =
-  (batches * 1.35) / 15;
+  (batches * 1.6) / 15;
 
 const yeastNeeded = batches;
 
@@ -960,8 +960,8 @@ async function deleteProduction(log: any) {
     const sugarUsed =
       (batches * 12) / 50;
 
-    const butterUsed =
-      (batches * 1.35) / 15;
+const butterUsed =
+  (batches * 1.6) / 15;
 
     const yeastUsed =
       batches;
