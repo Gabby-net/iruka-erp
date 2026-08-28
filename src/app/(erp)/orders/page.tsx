@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,6 +6,15 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
+
+type ToastType = "success" | "error" | "info";
+
+interface ToastState {
+  show: boolean;
+  type: ToastType;
+  title: string;
+  message: string;
+}
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -17,6 +27,17 @@ export default function OrdersPage() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  const [toast, setToast] = useState<ToastState>({
+    show: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
+
   const [orderItems, setOrderItems] = useState([
     {
       bread_type: "",
@@ -24,9 +45,101 @@ export default function OrdersPage() {
     },
   ]);
 
+  // ============================================================
+  // PREMIUM TOAST
+  // ============================================================
+
+  function showToast(
+    type: ToastType,
+    title: string,
+    message: string
+  ) {
+    setToast({
+      show: true,
+      type,
+      title,
+      message,
+    });
+
+    window.setTimeout(() => {
+      setToast((current) => ({
+        ...current,
+        show: false,
+      }));
+    }, 4500);
+  }
+
+  function hideToast() {
+    setToast((current) => ({
+      ...current,
+      show: false,
+    }));
+  }
+
+  // ============================================================
+  // INITIAL LOAD
+  // ============================================================
+
   useEffect(() => {
     fetchProducts();
     fetchOrders();
+  }, []);
+
+  // ============================================================
+  // SUPABASE REALTIME
+  // ============================================================
+
+  useEffect(() => {
+    const ordersChannel = supabase
+      .channel("orders-page-orders-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        async () => {
+          await fetchOrders();
+        }
+      )
+      .subscribe();
+
+    const productsChannel = supabase
+      .channel("orders-page-products-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "products",
+        },
+        async () => {
+          await fetchProducts();
+        }
+      )
+      .subscribe();
+
+    const notificationsChannel = supabase
+      .channel("orders-page-notifications-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+        },
+        async () => {
+          await fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(productsChannel);
+      supabase.removeChannel(notificationsChannel);
+    };
   }, []);
 
   // ============================================================
@@ -67,6 +180,39 @@ export default function OrdersPage() {
     }
 
     setOrders(data || []);
+  }
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
+  async function refreshPage() {
+    if (refreshing) return;
+
+    setRefreshing(true);
+
+    try {
+      await Promise.all([
+        fetchProducts(),
+        fetchOrders(),
+      ]);
+
+      showToast(
+        "success",
+        "Page Refreshed",
+        "Orders and product information are now up to date."
+      );
+    } catch (error) {
+      console.error("Refresh error:", error);
+
+      showToast(
+        "error",
+        "Refresh Failed",
+        "Could not refresh the page data."
+      );
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   // ============================================================
@@ -176,16 +322,14 @@ export default function OrdersPage() {
       );
     }
 
-    // ----------------------------------------------------------
-    // FIND EXISTING CUSTOMER BY PHONE
-    // ----------------------------------------------------------
-
-    const { data: existingCustomer, error: lookupError } =
-      await supabase
-        .from("customers")
-        .select("*")
-        .eq("phone", cleanPhone)
-        .maybeSingle();
+    const {
+      data: existingCustomer,
+      error: lookupError,
+    } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("phone", cleanPhone)
+      .maybeSingle();
 
     if (lookupError) {
       console.error(
@@ -198,10 +342,6 @@ export default function OrdersPage() {
       );
     }
 
-    // ----------------------------------------------------------
-    // EXISTING CUSTOMER
-    // ----------------------------------------------------------
-
     if (existingCustomer) {
       const customerUpdates: any = {};
 
@@ -213,18 +353,13 @@ export default function OrdersPage() {
           cleanName;
       }
 
-      if (
-        !existingCustomer.customer_type
-      ) {
+      if (!existingCustomer.customer_type) {
         customerUpdates.customer_type =
           "Bakery Customer";
       }
 
-      if (
-        !existingCustomer.status
-      ) {
-        customerUpdates.status =
-          "Active";
+      if (!existingCustomer.status) {
+        customerUpdates.status = "Active";
       }
 
       if (
@@ -249,23 +384,21 @@ export default function OrdersPage() {
       return existingCustomer.id;
     }
 
-    // ----------------------------------------------------------
-    // NEW BAKERY CUSTOMER
-    // ----------------------------------------------------------
-
-    const { data: newCustomer, error: createError } =
-      await supabase
-        .from("customers")
-        .insert({
-          full_name: cleanName,
-          phone: cleanPhone,
-          password: null,
-          is_verified: false,
-          customer_type: "Bakery Customer",
-          status: "Active",
-        })
-        .select()
-        .single();
+    const {
+      data: newCustomer,
+      error: createError,
+    } = await supabase
+      .from("customers")
+      .insert({
+        full_name: cleanName,
+        phone: cleanPhone,
+        password: null,
+        is_verified: false,
+        customer_type: "Bakery Customer",
+        status: "Active",
+      })
+      .select()
+      .single();
 
     if (createError || !newCustomer) {
       console.error(
@@ -289,21 +422,26 @@ export default function OrdersPage() {
   // ============================================================
 
   async function saveOrder() {
-    if (!customerName.trim()) {
-      alert("Enter customer name.");
-      return;
-    }
+    if (savingOrder) return;
 
-    if (!phone.trim()) {
-      alert(
-        "Enter the customer's phone number.\n\nThe phone number is used to identify and maintain the customer's permanent bakery record."
+setSavingOrder(true);
+    if (!customerName.trim()) {
+      showToast(
+        "error",
+        "Customer Required",
+        "Please enter the customer name."
       );
       return;
     }
 
-    // ----------------------------------------------------------
-    // VALIDATE ORDER ITEMS
-    // ----------------------------------------------------------
+    if (!phone.trim()) {
+      showToast(
+        "error",
+        "Phone Number Required",
+        "Enter the customer's phone number so the permanent bakery customer record can be maintained."
+      );
+      return;
+    }
 
     const validItems = orderItems.filter(
       (item) =>
@@ -312,14 +450,20 @@ export default function OrdersPage() {
     );
 
     if (validItems.length === 0) {
-      alert(
+      showToast(
+        "error",
+        "Order Items Required",
         "Add at least one bread item with a valid quantity."
       );
       return;
     }
 
+    if (savingOrder) return;
+
+setSavingOrder(true);
+
     // ----------------------------------------------------------
-    // VALIDATE STOCK BEFORE CREATING ORDER
+    // VALIDATE STOCK
     // ----------------------------------------------------------
 
     for (const item of validItems) {
@@ -328,7 +472,9 @@ export default function OrdersPage() {
       );
 
       if (!product) {
-        alert(
+        showToast(
+          "error",
+          "Product Not Found",
           `Product not found: ${item.bread_type}`
         );
         return;
@@ -338,35 +484,25 @@ export default function OrdersPage() {
         Number(product.stock || 0) <
         Number(item.quantity)
       ) {
-        alert(
-          `${item.bread_type} does not have enough stock.\n\nAvailable: ${Number(
+        showToast(
+          "error",
+          "Insufficient Stock",
+          `${item.bread_type} has only ${Number(
             product.stock || 0
-          ).toLocaleString()}\nRequested: ${Number(
+          ).toLocaleString()} available. You requested ${Number(
             item.quantity
-          ).toLocaleString()}`
+          ).toLocaleString()}.`
         );
         return;
       }
     }
 
     try {
-      // --------------------------------------------------------
-      // REGISTER / FIND CUSTOMER
-      // --------------------------------------------------------
-
       const customerId =
         await findOrCreateBakeryCustomer();
 
-      // --------------------------------------------------------
-      // CREATE ORDER NUMBER
-      // --------------------------------------------------------
-
       const orderNumber =
         `ORD-${Date.now()}`;
-
-      // --------------------------------------------------------
-      // CREATE ORDER
-      // --------------------------------------------------------
 
       const {
         data: orderData,
@@ -426,10 +562,6 @@ export default function OrdersPage() {
         );
       }
 
-      // --------------------------------------------------------
-      // CREATE ORDER ITEMS
-      // --------------------------------------------------------
-
       const itemsToInsert =
         validItems.map((item) => ({
           order_id:
@@ -460,7 +592,6 @@ export default function OrdersPage() {
         .insert(itemsToInsert);
 
       if (itemsError) {
-        // Roll back the order if items fail.
         await supabase
           .from("orders")
           .delete()
@@ -470,10 +601,6 @@ export default function OrdersPage() {
           `Could not create order items: ${itemsError.message}`
         );
       }
-
-      // --------------------------------------------------------
-      // RESET FORM
-      // --------------------------------------------------------
 
       setCustomerName("");
       setPhone("");
@@ -489,8 +616,10 @@ export default function OrdersPage() {
 
       await fetchOrders();
 
-      alert(
-        `Customer order created successfully.\n\nCustomer: ${customerName}\nOrder: ${orderNumber}\nTotal: ₦${totalAmount.toLocaleString()}`
+      showToast(
+        "success",
+        "Order Created Successfully",
+        `Customer order ${orderNumber} has been created for ${customerName}. Total: ₦${totalAmount.toLocaleString()}.`
       );
     } catch (error: any) {
       console.error(
@@ -498,11 +627,261 @@ export default function OrdersPage() {
         error
       );
 
-      alert(
+      showToast(
+        "error",
+        "Order Creation Failed",
         error?.message ||
           "Something went wrong while creating the order."
       );
+    } finally {
+      setSavingOrder(false);
     }
+  }
+
+  // ============================================================
+  // FIND CUSTOMER DEBTOR
+  // ============================================================
+
+  async function findCustomerDebtor(
+    order: any
+  ) {
+    let existingDebtor = null;
+
+    // CUSTOMER ID IS THE PRIMARY MATCH
+    if (order.customer_id) {
+      const {
+        data: debtorByCustomerId,
+        error: customerIdError,
+      } = await supabase
+        .from("debtors")
+        .select("*")
+        .eq(
+          "customer_id",
+          order.customer_id
+        )
+        .maybeSingle();
+
+if (!customerIdError && debtorByCustomerId) {
+  existingDebtor =
+    debtorByCustomerId;
+}
+    }
+
+    // PHONE IS FALLBACK FOR OLD RECORDS
+    if (
+      !existingDebtor &&
+      order.phone
+    ) {
+      const {
+        data: debtorByPhone,
+        error: phoneError,
+      } = await supabase
+        .from("debtors")
+        .select("*")
+        .eq(
+          "phone",
+          normalizePhone(order.phone)
+        )
+        .maybeSingle();
+
+      if (phoneError) {
+        console.error(
+          "Debtor phone lookup error:",
+          phoneError
+        );
+      }
+
+      existingDebtor =
+        debtorByPhone;
+    }
+
+    return existingDebtor;
+  }
+
+  // ============================================================
+  // RECALCULATE CUSTOMER OUTSTANDING DEBT
+  //
+  // IMPORTANT:
+  // A CUSTOMER MAY HAVE MORE THAN ONE UNPAID ORDER.
+  // THE DEBTOR BALANCE MUST REPRESENT ALL OUTSTANDING ORDERS.
+  // ============================================================
+
+  async function recalculateCustomerDebt(
+    order: any
+  ) {
+if (!order.customer_id && !order.phone) {
+  return 0;
+}
+
+let query = supabase
+  .from("orders")
+  .select(
+    "id, total_amount, amount_paid, payment_status, customer_id, phone, customer_name"
+  )
+  .in(
+    "payment_status",
+    [
+      "Pending",
+      "Partially Paid",
+    ]
+  );
+
+if (order.customer_id) {
+  query = query.eq(
+    "customer_id",
+    order.customer_id
+  );
+} else if (order.phone) {
+  query = query.eq(
+    "phone",
+    normalizePhone(order.phone)
+  );
+}
+
+const {
+  data: outstandingOrders,
+  error,
+} = await query;
+
+    if (error) {
+      throw new Error(
+        `Could not calculate customer debt: ${error.message}`
+      );
+    }
+
+    let totalDebt = 0;
+
+    for (
+      const outstandingOrder of
+        outstandingOrders || []
+    ) {
+      const total =
+        Number(
+          outstandingOrder.total_amount ||
+            0
+        );
+
+      const paid =
+        Number(
+          outstandingOrder.amount_paid ||
+            0
+        );
+
+      totalDebt += Math.max(
+        total - paid,
+        0
+      );
+    }
+
+    return totalDebt;
+  }
+
+  // ============================================================
+  // UPDATE DEBTOR RECORD
+  // ============================================================
+
+  async function syncDebtorForOrder(
+    order: any
+  ) {
+    const totalDebt =
+      await recalculateCustomerDebt(
+        order
+      );
+
+    const existingDebtor =
+      await findCustomerDebtor(order);
+
+    // ----------------------------------------------------------
+    // CUSTOMER STILL OWES MONEY
+    // ----------------------------------------------------------
+
+    if (totalDebt > 0) {
+      const debtorPayload: any = {
+        customer_name:
+          order.customer_name ||
+          "Customer",
+
+        phone:
+          normalizePhone(
+            order.phone || ""
+          ),
+
+        balance:
+          totalDebt,
+
+        status:
+          "Owing",
+      };
+
+      if (order.customer_id) {
+        debtorPayload.customer_id =
+          order.customer_id;
+      }
+
+      if (existingDebtor) {
+        const {
+          error: updateError,
+        } = await supabase
+          .from("debtors")
+          .update(
+            debtorPayload
+          )
+          .eq(
+            "id",
+            existingDebtor.id
+          );
+
+        if (updateError) {
+          throw new Error(
+            `Could not update debtor: ${updateError.message}`
+          );
+        }
+      } else {
+        const {
+          error: insertError,
+        } = await supabase
+          .from("debtors")
+          .insert({
+            ...debtorPayload,
+
+            location: "",
+
+            credit_limit: 0,
+          });
+
+        if (insertError) {
+          throw new Error(
+            `Could not create debtor: ${insertError.message}`
+          );
+        }
+      }
+
+      return totalDebt;
+    }
+
+    // ----------------------------------------------------------
+    // NO OUTSTANDING DEBT
+    // ----------------------------------------------------------
+
+    if (existingDebtor) {
+      const {
+        error: deleteError,
+      } = await supabase
+        .from("debtors")
+        .delete()
+        .eq(
+          "id",
+          existingDebtor.id
+        );
+
+      if (deleteError) {
+        throw new Error(
+          `Could not clear debtor record: ${deleteError.message}`
+        );
+      }
+    }
+
+    return 0;
   }
 
   // ============================================================
@@ -521,6 +900,10 @@ export default function OrdersPage() {
       order.amount_paid || 0
     );
 
+    // ----------------------------------------------------------
+    // PARTIAL PAYMENT
+    // ----------------------------------------------------------
+
     if (
       newStatus === "Partially Paid"
     ) {
@@ -538,7 +921,9 @@ export default function OrdersPage() {
         isNaN(amountPaid) ||
         amountPaid <= 0
       ) {
-        alert(
+        showToast(
+          "error",
+          "Invalid Payment",
           "Enter a valid payment amount."
         );
         return;
@@ -547,19 +932,38 @@ export default function OrdersPage() {
       if (
         amountPaid >= totalAmount
       ) {
-        alert(
+        showToast(
+          "error",
+          "Payment Amount Invalid",
           "Payment cannot be equal to or greater than the order total. Select Paid instead."
         );
         return;
       }
     }
 
+    // ----------------------------------------------------------
+    // FULL PAYMENT
+    // ----------------------------------------------------------
+
     if (newStatus === "Paid") {
       amountPaid = totalAmount;
     }
 
+    // ----------------------------------------------------------
+    // PENDING
+    // ----------------------------------------------------------
+
     if (
-      newStatus === "Pending" ||
+      newStatus === "Pending"
+    ) {
+      amountPaid = 0;
+    }
+
+    // ----------------------------------------------------------
+    // REFUNDED
+    // ----------------------------------------------------------
+
+    if (
       newStatus === "Refunded"
     ) {
       amountPaid = 0;
@@ -571,178 +975,120 @@ export default function OrdersPage() {
     );
 
     // ----------------------------------------------------------
-    // UPDATE ORDER
+    // UPDATE ORDER FIRST
     // ----------------------------------------------------------
 
-    const { error: orderError } =
-      await supabase
-        .from("orders")
-        .update({
-          payment_status:
-            newStatus,
+    const {
+      error: orderError,
+    } = await supabase
+      .from("orders")
+      .update({
+        payment_status:
+          newStatus,
 
-          amount_paid:
-            amountPaid,
+        amount_paid:
+          amountPaid,
 
-          balance:
-            balance,
+        balance:
+          balance,
 
-          paid:
-            amountPaid,
-        })
-        .eq("id", order.id);
+        paid:
+          amountPaid,
+      })
+      .eq(
+        "id",
+        order.id
+      );
 
     if (orderError) {
-      alert(orderError.message);
+      showToast(
+        "error",
+        "Payment Update Failed",
+        orderError.message
+      );
       return;
     }
 
     // ----------------------------------------------------------
-    // FIND CUSTOMER USING CUSTOMER_ID FIRST
+    // RESTORE DEBTOR ACCOUNTING LOGIC
+    //
+    // EVERY PARTIALLY PAID/PENDING CUSTOMER ORDER IS INCLUDED.
     // ----------------------------------------------------------
 
-    let existingDebtor = null;
+    try {
+      /*
+       * Pending and Partially Paid orders represent money
+       * still owed by the customer.
+       *
+       * Paid orders are removed from outstanding debt.
+       *
+       * The debtor balance is recalculated from ALL outstanding
+       * orders belonging to that customer.
+       */
 
-    const { data: debtorByCustomerId } =
-      await supabase
-        .from("debtors")
-        .select("*")
-        .eq(
-          "customer_id",
-          order.customer_id
-        )
-        .maybeSingle();
+      if (
+        newStatus ===
+          "Partially Paid" ||
+        newStatus === "Pending" ||
+        newStatus === "Paid"
+      ) {
+        const totalDebt =
+          await syncDebtorForOrder(
+            order
+          );
 
-    existingDebtor =
-      debtorByCustomerId;
+        await fetchOrders();
 
-    // ----------------------------------------------------------
-    // FALLBACK TO PHONE FOR OLD RECORDS
-    // ----------------------------------------------------------
-
-    if (
-      !existingDebtor &&
-      order.phone
-    ) {
-      const { data: debtorByPhone } =
-        await supabase
-          .from("debtors")
-          .select("*")
-          .eq(
-            "phone",
-            order.phone
-          )
-          .maybeSingle();
-
-      existingDebtor =
-        debtorByPhone;
-    }
-
-    // ----------------------------------------------------------
-    // CUSTOMER OWES MONEY
-    // ----------------------------------------------------------
-
-    if (
-      newStatus ===
-        "Partially Paid" &&
-      balance > 0
-    ) {
-      if (existingDebtor) {
-        const { error } =
-          await supabase
-            .from("debtors")
-            .update({
-              customer_name:
-                order.customer_name,
-
-              phone:
-                order.phone,
-
-              balance:
-                balance,
-
-              status:
-                "Owing",
-
-              customer_id:
-                order.customer_id ||
-                existingDebtor.customer_id,
-            })
-            .eq(
-              "id",
-              existingDebtor.id
-            );
-
-        if (error) {
-          alert(error.message);
-          return;
+        if (
+          newStatus ===
+          "Partially Paid"
+        ) {
+          showToast(
+            "success",
+            "Payment Recorded",
+            `₦${amountPaid.toLocaleString()} received. Customer outstanding debt is now ₦${totalDebt.toLocaleString()}.`
+          );
+        } else if (
+          newStatus === "Paid"
+        ) {
+          showToast(
+            "success",
+            "Payment Completed",
+            `Full payment of ₦${amountPaid.toLocaleString()} recorded successfully.`
+          );
+        } else {
+          showToast(
+            "success",
+            "Payment Status Updated",
+            "The order has been returned to Pending and the outstanding balance has been recalculated."
+          );
         }
-      } else {
-        const { error } =
-          await supabase
-            .from("debtors")
-            .insert({
-              customer_name:
-                order.customer_name,
 
-              phone:
-                order.phone,
-
-              location:
-                "",
-
-              credit_limit:
-                0,
-
-              balance:
-                balance,
-
-              status:
-                "Owing",
-
-              customer_id:
-                order.customer_id,
-            });
-
-        if (error) {
-          alert(error.message);
-          return;
-        }
+        return;
       }
+
+      await fetchOrders();
+
+      showToast(
+        "success",
+        "Payment Updated",
+        `Payment status changed to ${newStatus}.`
+      );
+    } catch (debtorError: any) {
+      console.error(
+        "Debtor synchronization error:",
+        debtorError
+      );
+
+      await fetchOrders();
+
+      showToast(
+        "error",
+        "Debtor Update Failed",
+        debtorError?.message ||
+          "Payment was updated, but the debtor record could not be synchronized."
+      );
     }
-
-    // ----------------------------------------------------------
-    // CUSTOMER FULLY PAID
-    // ----------------------------------------------------------
-
-    if (
-      newStatus === "Paid"
-    ) {
-      if (existingDebtor) {
-        const { error } =
-          await supabase
-            .from("debtors")
-            .update({
-              balance: 0,
-              status: "Paid",
-            })
-            .eq(
-              "id",
-              existingDebtor.id
-            );
-
-        if (error) {
-          alert(error.message);
-          return;
-        }
-      }
-    }
-
-    await fetchOrders();
-
-    alert(
-      `Payment updated successfully.\n\nAmount Paid: ₦${amountPaid.toLocaleString()}\nBalance: ₦${balance.toLocaleString()}`
-    );
   }
 
   // ============================================================
@@ -756,7 +1102,9 @@ export default function OrdersPage() {
       order.order_status ===
       "Completed"
     ) {
-      alert(
+      showToast(
+        "info",
+        "Already Completed",
         "This order has already been completed."
       );
       return;
@@ -774,7 +1122,11 @@ export default function OrdersPage() {
       );
 
     if (error) {
-      alert(error.message);
+      showToast(
+        "error",
+        "Order Error",
+        error.message
+      );
       return;
     }
 
@@ -795,7 +1147,9 @@ export default function OrdersPage() {
         productError ||
         !product
       ) {
-        alert(
+        showToast(
+          "error",
+          "Product Not Found",
           `Product not found: ${item.bread_type}`
         );
         return;
@@ -805,7 +1159,9 @@ export default function OrdersPage() {
         Number(product.stock || 0) <
         Number(item.quantity)
       ) {
-        alert(
+        showToast(
+          "error",
+          "Insufficient Stock",
           `${item.bread_type} does not have enough stock.`
         );
         return;
@@ -828,7 +1184,11 @@ export default function OrdersPage() {
         );
 
       if (updateError) {
-        alert(updateError.message);
+        showToast(
+          "error",
+          "Stock Update Failed",
+          updateError.message
+        );
         return;
       }
 
@@ -857,10 +1217,21 @@ export default function OrdersPage() {
           total_amount:
             total,
 
-          payment: 0,
+          payment:
+            Number(
+              order.amount_paid || 0
+            ),
 
           balance:
-            total,
+            Math.max(
+              Number(
+                order.total_amount || 0
+              ) -
+                Number(
+                  order.amount_paid || 0
+                ),
+              0
+            ),
 
           invoice_number:
             order.order_number ||
@@ -888,13 +1259,21 @@ export default function OrdersPage() {
               : "System",
 
           payment_method:
-            "Pending",
+            order.payment_status ===
+            "Paid"
+              ? "Cash"
+              : "Pending",
 
           payment_status:
-            "Unpaid",
+            order.payment_status ===
+            "Paid"
+              ? "Paid"
+              : "Unpaid",
 
           amount_paid:
-            0,
+            Number(
+              order.amount_paid || 0
+            ),
 
           customer_id:
             order.customer_id ||
@@ -939,10 +1318,16 @@ export default function OrdersPage() {
             `ORD-${order.id}`,
 
           payment_method:
-            "Pending",
+            order.payment_status ===
+            "Paid"
+              ? "Cash"
+              : "Pending",
 
           status:
-            "Pending",
+            order.payment_status ===
+            "Paid"
+              ? "Completed"
+              : "Pending",
 
           created_by:
             typeof window !==
@@ -983,14 +1368,20 @@ export default function OrdersPage() {
       );
 
     if (orderError) {
-      alert(orderError.message);
+      showToast(
+        "error",
+        "Order Completion Failed",
+        orderError.message
+      );
       return;
     }
 
     await fetchOrders();
 
-    alert(
-      "Order completed successfully."
+    showToast(
+      "success",
+      "Order Completed",
+      `Order ${order.order_number} has been completed successfully.`
     );
   }
 
@@ -1010,10 +1401,6 @@ export default function OrdersPage() {
       return;
     }
 
-    // ----------------------------------------------------------
-    // DELETE ORDER
-    // ----------------------------------------------------------
-
     const {
       error: deleteError,
     } = await supabase
@@ -1025,144 +1412,37 @@ export default function OrdersPage() {
       );
 
     if (deleteError) {
-      alert(deleteError.message);
+      showToast(
+        "error",
+        "Delete Failed",
+        deleteError.message
+      );
       return;
     }
 
     // ----------------------------------------------------------
-    // FIND REMAINING OUTSTANDING ORDERS
+    // RECALCULATE REMAINING DEBT
     // ----------------------------------------------------------
 
-    const {
-      data: remainingOrders,
-      error:
-        remainingOrdersError,
-    } = await supabase
-      .from("orders")
-      .select(
-        "id, total_amount, amount_paid, payment_status, phone, customer_name, customer_id"
-      )
-      .eq(
-        "customer_id",
-        order.customer_id
-      )
-      .in(
-        "payment_status",
-        [
-          "Partially Paid",
-          "Pending",
-        ]
-      );
-
-    if (
-      remainingOrdersError
-    ) {
-      console.error(
-        remainingOrdersError
-      );
-    }
-
-    // ----------------------------------------------------------
-    // CALCULATE REMAINING DEBT
-    // ----------------------------------------------------------
-
-    let remainingDebt = 0;
-
-    for (
-      const remainingOrder of
-        remainingOrders || []
-    ) {
-      const total =
-        Number(
-          remainingOrder.total_amount ||
-            0
+    try {
+      if (order.customer_id) {
+        await syncDebtorForOrder(
+          order
         );
-
-      const paid =
-        Number(
-          remainingOrder.amount_paid ||
-            0
-        );
-
-      remainingDebt += Math.max(
-        total - paid,
-        0
-      );
-    }
-
-    // ----------------------------------------------------------
-    // FIND DEBTOR
-    // ----------------------------------------------------------
-
-    let debtor = null;
-
-    if (order.customer_id) {
-      const { data } =
-        await supabase
-          .from("debtors")
-          .select("*")
-          .eq(
-            "customer_id",
-            order.customer_id
-          )
-          .maybeSingle();
-
-      debtor = data;
-    }
-
-    if (
-      !debtor &&
-      order.phone
-    ) {
-      const { data } =
-        await supabase
-          .from("debtors")
-          .select("*")
-          .eq(
-            "phone",
-            order.phone
-          )
-          .maybeSingle();
-
-      debtor = data;
-    }
-
-    // ----------------------------------------------------------
-    // UPDATE DEBTOR
-    // ----------------------------------------------------------
-
-    if (debtor) {
-      if (
-        remainingDebt > 0
-      ) {
-        await supabase
-          .from("debtors")
-          .update({
-            balance:
-              remainingDebt,
-
-            status:
-              "Owing",
-          })
-          .eq(
-            "id",
-            debtor.id
-          );
-      } else {
-        await supabase
-          .from("debtors")
-          .delete()
-          .eq(
-            "id",
-            debtor.id
-          );
       }
+    } catch (error) {
+      console.error(
+        "Debt recalculation after deletion failed:",
+        error
+      );
     }
 
     await fetchOrders();
 
-    alert(
-      "Order deleted successfully."
+    showToast(
+      "success",
+      "Order Deleted",
+      "The order was deleted and the customer's outstanding debt was recalculated."
     );
   }
 
@@ -1179,7 +1459,88 @@ export default function OrdersPage() {
     >
       <div className="min-h-screen bg-slate-950 p-10">
 
-        {/* HEADER */}
+        {/* ======================================================
+            PREMIUM TOAST NOTIFICATION
+        ====================================================== */}
+
+        {toast.show && (
+          <div className="fixed top-6 right-6 z-[100] w-[380px] max-w-[calc(100vw-32px)]">
+            <div
+              className={`relative overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl ${
+                toast.type === "success"
+                  ? "border-emerald-500/30 bg-slate-900/95"
+                  : toast.type === "error"
+                  ? "border-red-500/30 bg-slate-900/95"
+                  : "border-blue-500/30 bg-slate-900/95"
+              }`}
+            >
+
+              <div
+                className={`h-1 w-full ${
+                  toast.type === "success"
+                    ? "bg-gradient-to-r from-emerald-400 to-green-500"
+                    : toast.type === "error"
+                    ? "bg-gradient-to-r from-red-500 to-orange-500"
+                    : "bg-gradient-to-r from-blue-500 to-cyan-400"
+                }`}
+              />
+
+              <div className="p-5">
+
+                <div className="flex items-start gap-4">
+
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
+                      toast.type === "success"
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : toast.type === "error"
+                        ? "bg-red-500/15 text-red-400"
+                        : "bg-blue-500/15 text-blue-400"
+                    }`}
+                  >
+                    {toast.type ===
+                    "success"
+                      ? "✓"
+                      : toast.type ===
+                        "error"
+                      ? "!"
+                      : "i"}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+
+                    <div className="flex items-start justify-between gap-3">
+
+                      <h3 className="font-bold text-white">
+                        {toast.title}
+                      </h3>
+
+                      <button
+                        onClick={hideToast}
+                        className="text-slate-500 hover:text-white transition text-lg leading-none"
+                      >
+                        ×
+                      </button>
+
+                    </div>
+
+                    <p className="mt-1 text-sm leading-6 text-slate-300">
+                      {toast.message}
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================
+            HEADER
+        ====================================================== */}
 
         <div className="mb-10 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">
 
@@ -1612,14 +1973,28 @@ export default function OrdersPage() {
 
             </div>
 
-            <button
-              onClick={
-                saveOrder
-              }
-              className="mt-8 w-full bg-green-700 hover:bg-green-600 text-white p-5 rounded-2xl font-bold"
-            >
-              Save Customer Order
-            </button>
+<button
+  type="button"
+  onClick={saveOrder}
+  disabled={savingOrder}
+  className={`mt-8 w-full rounded-2xl p-5 font-bold text-white shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${
+    savingOrder
+      ? "bg-green-900 cursor-not-allowed opacity-90"
+      : "bg-gradient-to-r from-green-700 via-emerald-600 to-green-700 hover:from-green-600 hover:via-emerald-500 hover:to-green-600 hover:scale-[1.01] hover:shadow-2xl"
+  }`}
+>
+  {savingOrder ? (
+    <>
+      <span className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+      <span>Creating Customer Order...</span>
+    </>
+  ) : (
+    <>
+      <span className="text-xl">✓</span>
+      <span>Save Customer Order</span>
+    </>
+  )}
+</button>
 
           </div>
 
@@ -1629,9 +2004,33 @@ export default function OrdersPage() {
 
         <div className="bg-slate-900 rounded-3xl shadow p-8">
 
-          <h2 className="text-3xl font-black text-white mb-8">
-            Customer Order History
-          </h2>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-8">
+
+            <h2 className="text-3xl font-black text-white">
+              Customer Order History
+            </h2>
+
+            <button
+              onClick={refreshPage}
+              disabled={refreshing}
+              className="inline-flex items-center justify-center gap-3 rounded-2xl bg-blue-950 hover:bg-blue-900 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 font-bold transition-all"
+            >
+              <span
+                className={
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              >
+                ↻
+              </span>
+
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
+
+          </div>
 
           <div className="overflow-x-auto">
 
@@ -1771,29 +2170,29 @@ export default function OrdersPage() {
 
                         </select>
 
-<div className="mt-2 text-xs text-slate-400">
+                        <div className="mt-2 text-xs text-slate-400">
 
-  Paid: ₦
-  {Number(
-    order.amount_paid || 0
-  ).toLocaleString()}
+                          Paid: ₦
+                          {Number(
+                            order.amount_paid || 0
+                          ).toLocaleString()}
 
-  <br />
+                          <br />
 
-  Balance: ₦
-  {order.payment_status === "Paid"
-    ? "0"
-    : Math.max(
-        Number(
-          order.total_amount || 0
-        ) -
-          Number(
-            order.amount_paid || 0
-          ),
-        0
-      ).toLocaleString()}
+                          Balance: ₦
+                          {order.payment_status === "Paid"
+                            ? "0"
+                            : Math.max(
+                                Number(
+                                  order.total_amount || 0
+                                ) -
+                                  Number(
+                                    order.amount_paid || 0
+                                  ),
+                                0
+                              ).toLocaleString()}
 
-</div>
+                        </div>
 
                       </td>
 
@@ -1864,7 +2263,9 @@ export default function OrdersPage() {
                             if (
                               error
                             ) {
-                              alert(
+                              showToast(
+                                "error",
+                                "Status Update Failed",
                                 error.message
                               );
                               return;
@@ -1892,25 +2293,44 @@ export default function OrdersPage() {
                               if (
                                 order.customer_id
                               ) {
-                                await supabase
-                                  .from(
-                                    "notifications"
-                                  )
-                                  .insert({
-                                    customer_id:
-                                      order.customer_id,
+                                const {
+                                  error:
+                                    notificationError,
+                                } =
+                                  await supabase
+                                    .from(
+                                      "notifications"
+                                    )
+                                    .insert({
+                                      customer_id:
+                                        order.customer_id,
 
-                                    title,
+                                      title,
 
-                                    message,
+                                      message,
 
-                                    is_read:
-                                      false,
-                                  });
+                                      is_read:
+                                        false,
+                                    });
+
+                                if (
+                                  notificationError
+                                ) {
+                                  console.error(
+                                    "Notification error:",
+                                    notificationError
+                                  );
+                                }
                               }
                             }
 
                             await fetchOrders();
+
+                            showToast(
+                              "success",
+                              "Order Status Updated",
+                              `${order.order_number} is now ${newStatus}.`
+                            );
                           }}
                           className="w-full rounded-xl border border-slate-700 bg-slate-800 text-white px-4 py-2 text-sm"
                         >
