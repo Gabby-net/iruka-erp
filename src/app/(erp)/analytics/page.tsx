@@ -4,21 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 import ExecutiveHeader from "@/components/analytics/ExecutiveHeader";
-import ExecutiveCards from "@/components/analytics/ExecutiveCards";
-import FinancialHealth from "@/components/analytics/FinancialHealth";
-import InventoryHealth from "@/components/analytics/InventoryHealth";
-import CustomerAnalytics from "@/components/analytics/CustomerAnalytics";
-import BestSellingProducts from "@/components/analytics/BestSellingProducts";
-import TopCustomers from "@/components/analytics/TopCustomers";
-import CEOActionCenter from "@/components/analytics/CEOActionCenter";
-import BusinessGrowthIndex from "@/components/analytics/BusinessGrowthIndex";
-import AIBusinessForecast from "@/components/analytics/AIBusinessForecast";
 
 import RevenueChart from "@/components/analytics/RevenueChart";
 import ProductionChart from "@/components/analytics/ProductionChart";
 import SalesChart from "@/components/analytics/SalesChart";
 import CustomerGrowthChart from "@/components/analytics/CustomerGrowthChart";
 import InventoryChart from "@/components/analytics/InventoryChart";
+
+import CustomerAnalytics from "@/components/analytics/CustomerAnalytics";
+import BestSellingProducts from "@/components/analytics/BestSellingProducts";
+import TopCustomers from "@/components/analytics/TopCustomers";
 
 type Period = "today" | "week" | "month" | "year";
 
@@ -30,288 +25,359 @@ export default function AnalyticsPage() {
   const [sales, setSales] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [production, setProduction] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
-  const [finance, setFinance] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
 
-useEffect(() => {
-  fetchAnalytics();
-}, [period]);
+  /* =========================================================
+     FETCH ANALYTICS
+  ========================================================= */
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [period]);
 
   async function fetchAnalytics() {
     setLoading(true);
-    let startDate = new Date();
 
-switch (period) {
-  case "today":
-    startDate.setHours(0, 0, 0, 0);
-    break;
+    try {
+      let startDate = new Date();
 
-  case "week":
-    startDate.setDate(startDate.getDate() - 7);
-    break;
+      switch (period) {
+        case "today":
+          startDate.setHours(0, 0, 0, 0);
+          break;
 
-  case "month":
-    startDate.setMonth(startDate.getMonth() - 1);
-    break;
+        case "week":
+          startDate.setDate(startDate.getDate() - 7);
+          break;
 
-  case "year":
-    startDate.setFullYear(startDate.getFullYear() - 1);
-    break;
-}
+        case "month":
+          startDate.setMonth(startDate.getMonth() - 1);
+          break;
 
-const fromDate = startDate.toISOString();
+        case "year":
+          startDate.setFullYear(startDate.getFullYear() - 1);
+          break;
+      }
 
-const [
-  salesRes,
-  ordersRes,
-  customersRes,
-  productsRes,
-  productionRes,
-  inventoryRes,
-  financeRes,
-] = await Promise.all([
-supabase
-  .from("sales")
-  .select("*")
-  .gte("created_at", fromDate)
-  .order("created_at", { ascending: false }),
+      const fromDate = startDate.toISOString();
 
-supabase
-  .from("orders")
-  .select("*")
-  .gte("created_at", fromDate)
-  .order("created_at", { ascending: false }),
+      const [
+        salesRes,
+        ordersRes,
+        customersRes,
+        productionRes,
+        inventoryRes,
+        expensesRes,
+      ] = await Promise.all([
+        supabase
+          .from("sales")
+          .select("*")
+          .gte("created_at", fromDate)
+          .order("created_at", { ascending: false }),
 
-supabase
-  .from("customers")
-  .select("*")
-  .gte("created_at", fromDate)
-  .order("created_at", { ascending: false }),
+        supabase
+          .from("orders")
+          .select("*")
+          .gte("created_at", fromDate)
+          .order("created_at", { ascending: false }),
 
-  supabase
-    .from("products")
-    .select("*"),
+        supabase
+          .from("customers")
+          .select("*")
+          .gte("created_at", fromDate)
+          .order("created_at", { ascending: false }),
 
-supabase
-  .from("production_logs")
-  .select("*")
-  .gte("created_at", fromDate)
-  .order("created_at", { ascending: false }),
+        supabase
+          .from("production_logs")
+          .select("*")
+          .gte("created_at", fromDate)
+          .order("created_at", { ascending: false }),
 
-supabase
-  .from("inventory")
-  .select("*"),
+        supabase
+          .from("inventory")
+          .select("*"),
 
-supabase
-  .from("finance_transactions")
-  .select("*")
-  .gte("created_at", fromDate)
-  .order("created_at", { ascending: false }),
-]);
+        supabase
+          .from("expenses")
+          .select("*")
+          .gte("created_at", fromDate)
+          .order("created_at", { ascending: false }),
+      ]);
 
-    setSales(salesRes.data || []);
-    setOrders(ordersRes.data || []);
-    setCustomers(customersRes.data || []);
-    setProducts(productsRes.data || []);
-    setProduction(productionRes.data || []);
-    setInventory(inventoryRes.data || []);
-    setFinance(financeRes.data || []);
+      if (salesRes.error) {
+        console.error("Analytics Sales Error:", salesRes.error);
+      }
 
-    if (salesRes.error) console.error("Sales:", salesRes.error);
+      if (ordersRes.error) {
+        console.error("Analytics Orders Error:", ordersRes.error);
+      }
 
-if (ordersRes.error) console.error("Orders:", ordersRes.error);
+      if (customersRes.error) {
+        console.error("Analytics Customers Error:", customersRes.error);
+      }
 
-if (customersRes.error) console.error("Customers:", customersRes.error);
+      if (productionRes.error) {
+        console.error("Analytics Production Error:", productionRes.error);
+      }
 
-if (productsRes.error) console.error("Products:", productsRes.error);
+      if (inventoryRes.error) {
+        console.error("Analytics Inventory Error:", inventoryRes.error);
+      }
 
-if (productionRes.error) console.error("Production:", productionRes.error);
+      if (expensesRes.error) {
+        console.error("Analytics Expenses Error:", expensesRes.error);
+      }
 
-if (inventoryRes.error) console.error("Inventory:", inventoryRes.error);
-
-if (financeRes.error) console.error("Finance:", financeRes.error);
-
-    setLoading(false);
+      setSales(salesRes.data || []);
+      setOrders(ordersRes.data || []);
+      setCustomers(customersRes.data || []);
+      setProduction(productionRes.data || []);
+      setInventory(inventoryRes.data || []);
+      setExpenses(expensesRes.data || []);
+    } catch (error) {
+      console.error("Analytics Fetch Error:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
-const totalRevenue = useMemo(() => {
-  return sales.reduce(
-    (sum, sale) => sum + Number(sale.total_amount || 0),
-    0
-  );
-}, [sales]);
+  /* =========================================================
+     REALTIME UPDATES
+  ========================================================= */
 
-  const totalExpenses = useMemo(() => {
-    return finance
-      .filter((x) => x.type === "expense")
-      .reduce((a, b) => a + Number(b.amount || 0), 0);
-  }, [finance]);
+  useEffect(() => {
+    const channel = supabase
+      .channel("analytics-live-updates")
 
-  const totalProfit = totalRevenue - totalExpenses;
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "sales",
+        },
+        () => {
+          fetchAnalytics();
+        }
+      )
 
-  const totalOrders = useMemo(() => {
-  return orders.length;
-}, [orders]);
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "expenses",
+        },
+        () => {
+          fetchAnalytics();
+        }
+      )
 
-  const totalCustomers = useMemo(() => {
-  return customers.length;
-}, [customers]);
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        () => {
+          fetchAnalytics();
+        }
+      )
 
-  const totalProducts = useMemo(() => {
-  return products.length;
-}, [products]);
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "customers",
+        },
+        () => {
+          fetchAnalytics();
+        }
+      )
 
-const totalProduction = useMemo(() => {
-  const today = new Date().toISOString().split("T")[0];
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "production_logs",
+        },
+        () => {
+          fetchAnalytics();
+        }
+      )
 
-  return production
-    .filter((item) => item.production_date === today)
-    .reduce(
-      (sum, item) => sum + Number(item.quantity || 0),
-      0
-    );
-}, [production]);
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "inventory",
+        },
+        () => {
+          fetchAnalytics();
+        }
+      )
 
-const inventoryValue = useMemo(() => {
-  return inventory.reduce(
-    (sum, item) =>
-      sum +
-      Number(item.quantity || 0) *
-      Number(item.unit_cost || 0),
-    0
-  );
-}, [inventory]);
+      .subscribe();
 
-const lowStockItems = useMemo(() => {
-  return inventory.filter(
-    (item) =>
-      Number(item.quantity || 0) <=
-      Number(item.reorder_level || 0)
-  ).length;
-}, [inventory]);
-const revenueChartData = useMemo(() => {
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [period]);
 
-  const months = [
-    "Jan","Feb","Mar","Apr","May","Jun",
-    "Jul","Aug","Sep","Oct","Nov","Dec"
-  ];
+  /* =========================================================
+     REVENUE + EXPENSE CHART
+  ========================================================= */
 
-  return months.map((month, index) => {
+  const revenueChartData = useMemo(() => {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
 
-    const monthSales = sales.filter((sale: any) => {
+    return months.map((month, index) => {
+      const monthSales = sales.filter((sale: any) => {
+        if (!sale.created_at) return false;
 
-      if (!sale.created_at) return false;
+        return new Date(sale.created_at).getMonth() === index;
+      });
 
-      return new Date(sale.created_at).getMonth() === index;
+      const monthExpenses = expenses.filter((expense: any) => {
+        if (!expense.created_at) return false;
 
-    });
+        return new Date(expense.created_at).getMonth() === index;
+      });
 
-    const monthExpenses = finance.filter((item: any) => {
-
-      if (!item.created_at) return false;
-
-      return (
-        item.type?.toLowerCase() === "expense" &&
-        new Date(item.created_at).getMonth() === index
+      const revenue = monthSales.reduce(
+        (sum, sale) =>
+          sum + Number(sale.total_amount || 0),
+        0
       );
 
+      const expenseTotal = monthExpenses.reduce(
+        (sum, expense) =>
+          sum + Number(expense.amount || 0),
+        0
+      );
+
+      return {
+        name: month,
+        revenue,
+        expenses: expenseTotal,
+        profit: revenue - expenseTotal,
+      };
     });
+  }, [sales, expenses]);
 
-    const revenue = monthSales.reduce(
+  /* =========================================================
+     PRODUCTION CHART
+  ========================================================= */
 
-      (sum, sale) => sum + Number(sale.total_amount || 0),
+  const productionChartData = useMemo(() => {
+    return production.map((item: any) => ({
+      product:
+        item.bread ||
+        item.product_name ||
+        item.name ||
+        "Unknown",
 
-      0
+      produced: Number(item.quantity || 0),
 
-    );
+      waste: Number(item.waste_quantity || 0),
+    }));
+  }, [production]);
 
-    const expenses = monthExpenses.reduce(
-
-      (sum, item) => sum + Number(item.amount || 0),
-
-      0
-
-    );
-
-    return {
-
-      name: month,
-
-      revenue,
-
-      expenses,
-
-      profit: revenue - expenses,
-
-    };
-
-  });
-
-}, [sales, finance]);
-
-const productionChartData = useMemo(() => {
-  return production.map((item: any) => ({
-    product: item.bread,
-    produced: Number(item.quantity || 0),
-    waste: Number(item.waste_quantity || 0),
-  }));
-}, [production]);
+  /* =========================================================
+     SALES CHART
+  ========================================================= */
 
   const salesChartData = useMemo(() => {
     return sales.map((item: any) => ({
-      product: item.product_name,
+      product:
+        item.product_name ||
+        "Unknown",
+
       quantity: Number(item.quantity || 0),
+
       revenue: Number(item.total_amount || 0),
     }));
   }, [sales]);
 
-const customerPerformanceChartData = useMemo(() => {
+  /* =========================================================
+     CUSTOMER GROWTH
+  ========================================================= */
 
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+  const customerPerformanceChartData = useMemo(() => {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
 
-  return months.map((month, index) => {
+    return months.map((month, index) => {
+      const monthOrders = orders.filter(
+        (order: any) => {
+          if (!order.created_at) return false;
 
-    const monthOrders = orders.filter((order: any) => {
+          return (
+            new Date(order.created_at).getMonth() === index
+          );
+        }
+      );
 
-      if (!order.created_at) return false;
-
-      return new Date(order.created_at).getMonth() === index;
-
+      return {
+        month,
+        orders: monthOrders.length,
+      };
     });
+  }, [orders]);
 
-    return {
+  /* =========================================================
+     INVENTORY CHART
+  ========================================================= */
 
-      month,
+  const inventoryChartData = useMemo(() => {
+    return inventory.map((item: any) => ({
+      name:
+        item.material_name ||
+        item.name ||
+        "Unknown",
 
-      orders: monthOrders.length,
+      value: Number(
+        item.current_stock ||
+        item.quantity ||
+        0
+      ),
+    }));
+  }, [inventory]);
 
-    };
-
-  });
-
-}, [orders]);
-
-const inventoryChartData = useMemo(() => {
-  return inventory.map((item: any) => ({
-    name: item.material_name || item.name,
-    value: Number(item.current_stock || item.quantity || 0),
-  }));
-}, [inventory]);
+  /* =========================================================
+     BEST SELLING PRODUCTS
+  ========================================================= */
 
   const bestSellingProducts = useMemo(() => {
     const grouped: Record<
@@ -325,6 +391,8 @@ const inventoryChartData = useMemo(() => {
     sales.forEach((sale: any) => {
       const product = sale.product_name;
 
+      if (!product) return;
+
       if (!grouped[product]) {
         grouped[product] = {
           quantity: 0,
@@ -332,13 +400,11 @@ const inventoryChartData = useMemo(() => {
         };
       }
 
-      grouped[product].quantity += Number(
-        sale.quantity || 0
-      );
+      grouped[product].quantity +=
+        Number(sale.quantity || 0);
 
-      grouped[product].revenue += Number(
-        sale.total_amount || 0
-      );
+      grouped[product].revenue +=
+        Number(sale.total_amount || 0);
     });
 
     return Object.entries(grouped)
@@ -347,9 +413,16 @@ const inventoryChartData = useMemo(() => {
         quantity: value.quantity,
         revenue: value.revenue,
       }))
-      .sort((a, b) => b.quantity - a.quantity)
+      .sort(
+        (a, b) =>
+          b.quantity - a.quantity
+      )
       .slice(0, 5);
   }, [sales]);
+
+  /* =========================================================
+     TOP CUSTOMERS
+  ========================================================= */
 
   const topCustomers = useMemo(() => {
     const grouped: Record<
@@ -362,7 +435,8 @@ const inventoryChartData = useMemo(() => {
 
     sales.forEach((sale: any) => {
       const customer =
-        sale.customer_name || "Walk-in";
+        sale.customer_name ||
+        "Walk-in";
 
       if (!grouped[customer]) {
         grouped[customer] = {
@@ -373,9 +447,10 @@ const inventoryChartData = useMemo(() => {
 
       grouped[customer].orders++;
 
-      grouped[customer].spent += Number(
-        sale.total_amount || 0
-      );
+      grouped[customer].spent +=
+        Number(
+          sale.total_amount || 0
+        );
     });
 
     return Object.entries(grouped)
@@ -384,117 +459,305 @@ const inventoryChartData = useMemo(() => {
         orders: value.orders,
         spent: value.spent,
       }))
-      .sort((a, b) => b.spent - a.spent)
+      .sort(
+        (a, b) =>
+          b.spent - a.spent
+      )
       .slice(0, 5);
   }, [sales]);
 
-  const businessGrowth = useMemo(() => {
+  /* =========================================================
+     EXPORT REPORT
+  ========================================================= */
 
-  const revenueGrowth =
-    totalRevenue > 0
-      ? Math.min(
-          100,
-          Math.round((totalRevenue / 1000000) * 10)
+  function exportReport() {
+    try {
+      const rows: string[][] = [];
+
+      rows.push([
+        "IRUKA INDUSTRIES LTD - ANALYTICS REPORT",
+      ]);
+
+      rows.push([
+        `Period: ${period.toUpperCase()}`,
+      ]);
+
+      rows.push([
+        `Generated: ${new Date().toLocaleString()}`,
+      ]);
+
+      rows.push([]);
+
+      /* SALES */
+
+      rows.push([
+        "SALES",
+      ]);
+
+      rows.push([
+        "Date",
+        "Product",
+        "Customer",
+        "Quantity",
+        "Revenue",
+      ]);
+
+      sales.forEach((sale: any) => {
+        rows.push([
+          sale.created_at
+            ? new Date(
+                sale.created_at
+              ).toLocaleString()
+            : "",
+
+          sale.product_name || "",
+
+          sale.customer_name || "Walk-in",
+
+          String(
+            Number(
+              sale.quantity || 0
+            )
+          ),
+
+          String(
+            Number(
+              sale.total_amount || 0
+            )
+          ),
+        ]);
+      });
+
+      rows.push([]);
+
+      /* PRODUCTION */
+
+      rows.push([
+        "PRODUCTION",
+      ]);
+
+      rows.push([
+        "Date",
+        "Product",
+        "Shift",
+        "Batch",
+        "Dough Batches",
+        "Produced",
+        "Waste",
+        "Net Production",
+      ]);
+
+      production.forEach((item: any) => {
+        const produced =
+          Number(item.quantity || 0);
+
+        const waste =
+          Number(
+            item.waste_quantity || 0
+          );
+
+        rows.push([
+          item.created_at
+            ? new Date(
+                item.created_at
+              ).toLocaleString()
+            : "",
+
+          item.bread ||
+            item.product_name ||
+            "",
+
+          item.shift || "",
+
+          item.batch || "",
+
+          String(
+            Number(
+              item.dough_batches || 0
+            )
+          ),
+
+          String(produced),
+
+          String(waste),
+
+          String(
+            produced - waste
+          ),
+        ]);
+      });
+
+      rows.push([]);
+
+      /* EXPENSES */
+
+      rows.push([
+        "EXPENSES",
+      ]);
+
+      rows.push([
+        "Date",
+        "Description",
+        "Amount",
+      ]);
+
+      expenses.forEach((expense: any) => {
+        rows.push([
+          expense.created_at
+            ? new Date(
+                expense.created_at
+              ).toLocaleString()
+            : "",
+
+          expense.description ||
+            expense.category ||
+            "",
+
+          String(
+            Number(
+              expense.amount || 0
+            )
+          ),
+        ]);
+      });
+
+      rows.push([]);
+
+      /* INVENTORY */
+
+      rows.push([
+        "CURRENT INVENTORY",
+      ]);
+
+      rows.push([
+        "Material",
+        "Quantity",
+        "Unit Cost",
+      ]);
+
+      inventory.forEach((item: any) => {
+        rows.push([
+          item.name ||
+            item.material_name ||
+            "",
+
+          String(
+            Number(
+              item.quantity ||
+                item.current_stock ||
+                0
+            )
+          ),
+
+          String(
+            Number(
+              item.unit_cost || 0
+            )
+          ),
+        ]);
+      });
+
+      /* CSV ESCAPING */
+
+      const csv = rows
+        .map((row) =>
+          row
+            .map((value) => {
+              const text =
+                String(value ?? "");
+
+              return `"${text.replace(
+                /"/g,
+                '""'
+              )}"`;
+            })
+            .join(",")
         )
-      : 0;
+        .join("\n");
 
-  const salesGrowth =
-    sales.length > 0
-      ? Math.min(100, sales.length * 2)
-      : 0;
+      const blob = new Blob(
+        [csv],
+        {
+          type:
+            "text/csv;charset=utf-8;",
+        }
+      );
 
-  const customerGrowth =
-    customers.length > 0
-      ? Math.min(100, customers.length * 3)
-      : 0;
+      const url =
+        URL.createObjectURL(blob);
 
-  const productionGrowth =
-    production.length > 0
-      ? Math.min(100, production.length * 2)
-      : 0;
+      const link =
+        document.createElement("a");
 
-  const profitMargin =
-    totalRevenue > 0
-      ? Math.round(
-          (totalProfit / totalRevenue) * 100
-        )
-      : 0;
+      link.href = url;
 
-  return {
+      link.download =
+        `IRUKA-Analytics-${period}-${new Date()
+          .toISOString()
+          .split("T")[0]}.csv`;
 
-    revenueGrowth,
+      document.body.appendChild(link);
 
-    salesGrowth,
+      link.click();
 
-    customerGrowth,
+      document.body.removeChild(link);
 
-    productionGrowth,
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(
+        "Report export error:",
+        error
+      );
 
-    profitMargin,
+      alert(
+        "Unable to export analytics report."
+      );
+    }
+  }
 
-  };
-
-}, [
-  totalRevenue,
-  totalProfit,
-  sales,
-  customers,
-  production,
-]);
-
-const bestSellingProductName =
-  bestSellingProducts.length > 0
-    ? bestSellingProducts[0].name
-    : "No sales yet";
+  /* =========================================================
+     LOADING
+  ========================================================= */
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white text-xl">
-        Loading Analytics...
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+        <div className="text-center">
+
+          <div className="text-xl font-bold">
+            Loading Analytics...
+          </div>
+
+          <p className="text-slate-400 mt-2">
+            Preparing your business intelligence dashboard.
+          </p>
+
+        </div>
       </div>
     );
   }
-    return (
+
+  /* =========================================================
+     PAGE
+  ========================================================= */
+
+  return (
     <div className="min-h-screen bg-slate-950 p-6">
+
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
 
       <ExecutiveHeader
         period={period}
         setPeriod={setPeriod}
         onRefresh={fetchAnalytics}
+        onExport={exportReport}
       />
 
-      <ExecutiveCards
-        totalRevenue={totalRevenue}
-        totalProfit={totalProfit}
-        totalExpenses={totalExpenses}
-        totalOrders={totalOrders}
-        totalCustomers={totalCustomers}
-        totalProducts={totalProducts}
-        totalProduction={totalProduction}
-        inventoryValue={inventoryValue}
-      />
-
-<div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
-
-  <BusinessGrowthIndex
-    revenueGrowth={businessGrowth.revenueGrowth}
-    salesGrowth={businessGrowth.salesGrowth}
-    customerGrowth={businessGrowth.customerGrowth}
-    productionGrowth={businessGrowth.productionGrowth}
-    profitMargin={businessGrowth.profitMargin}
-  />
-
-  <AIBusinessForecast
-    revenue={totalRevenue}
-    expenses={totalExpenses}
-    profit={totalProfit}
-    orders={totalOrders}
-    customers={totalCustomers}
-    lowStockItems={lowStockItems}
-    bestSellingProduct={bestSellingProductName}
-  />
-
-</div>
+      {/* =====================================================
+          REVENUE + PRODUCTION
+      ===================================================== */}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
 
@@ -508,30 +771,46 @@ const bestSellingProductName =
 
       </div>
 
+      {/* =====================================================
+          SALES + CUSTOMER GROWTH
+      ===================================================== */}
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
 
         <SalesChart
           data={salesChartData}
         />
 
-<CustomerGrowthChart
-  data={customerPerformanceChartData}
-/>
+        <CustomerGrowthChart
+          data={
+            customerPerformanceChartData
+          }
+        />
 
       </div>
+
+      {/* =====================================================
+          INVENTORY
+      ===================================================== */}
 
       <div className="mt-8">
 
-<InventoryChart
-  data={inventoryChartData}
-/>
+        <InventoryChart
+          data={inventoryChartData}
+        />
 
       </div>
+
+      {/* =====================================================
+          BEST SELLING + TOP CUSTOMERS
+      ===================================================== */}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
 
         <BestSellingProducts
-          products={bestSellingProducts}
+          products={
+            bestSellingProducts
+          }
         />
 
         <TopCustomers
@@ -540,24 +819,15 @@ const bestSellingProductName =
 
       </div>
 
+      {/* =====================================================
+          CUSTOMER ANALYTICS
+      ===================================================== */}
+
       <div className="mt-8">
 
         <CustomerAnalytics
           customers={customers}
           orders={orders}
-        />
-
-      </div>
-
-      <div className="mt-8">
-
-        <CEOActionCenter
-          revenue={totalRevenue}
-          expenses={totalExpenses}
-          profit={totalProfit}
-          lowStockItems={lowStockItems}
-          totalCustomers={totalCustomers}
-          totalOrders={totalOrders}
         />
 
       </div>

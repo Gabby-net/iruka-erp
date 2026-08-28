@@ -1,19 +1,59 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Package,
+  Search,
+  AlertTriangle,
+  Boxes,
+  Banknote,
+  ChevronRight,
+  CalendarDays,
+  RefreshCw,
+} from "lucide-react";
+
 import { supabase } from "@/lib/supabase";
 
 export default function ProductsPage() {
+  const router = useRouter();
+
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+useEffect(() => {
+  fetchProducts();
 
-  async function fetchProducts() {
-    setLoading(true);
+  const channel = supabase
+    .channel("products-live-updates")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "products",
+      },
+      (payload) => {
+        console.log("Products table changed:", payload);
+
+        fetchProducts();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
+  async function fetchProducts(showRefresh = false) {
+    if (showRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
     const { data, error } = await supabase
       .from("products")
@@ -21,112 +61,273 @@ export default function ProductsPage() {
       .order("id", { ascending: true });
 
     if (error) {
-      console.error(error);
+      console.error("Products error:", error);
     } else {
       setProducts(data || []);
     }
 
     setLoading(false);
+    setRefreshing(false);
   }
 
-  const filteredProducts = products.filter((product) =>
-    product.name?.toLowerCase().includes(search.toLowerCase())
+  /* ============================
+        SEARCH
+  ============================ */
+
+  const filteredProducts = useMemo(() => {
+    const searchTerm = search.trim().toLowerCase();
+
+    if (!searchTerm) {
+      return products;
+    }
+
+    return products.filter((product) => {
+      const name = String(product.name || "").toLowerCase();
+      const sku = String(product.sku || "").toLowerCase();
+
+      return (
+        name.includes(searchTerm) ||
+        sku.includes(searchTerm)
+      );
+    });
+  }, [products, search]);
+
+  /* ============================
+        KPIs
+  ============================ */
+
+  const totalStock = useMemo(() => {
+    return products.reduce(
+      (sum, product) =>
+        sum + Number(product.stock || 0),
+      0
+    );
+  }, [products]);
+
+  const inventoryValue = useMemo(() => {
+    return products.reduce(
+      (sum, product) =>
+        sum +
+        Number(product.stock || 0) *
+          Number(product.price || 0),
+      0
+    );
+  }, [products]);
+
+  const lowStockCount = useMemo(() => {
+    return products.filter(
+      (product) =>
+        Number(product.stock || 0) <=
+        Number(product.reorder_level || 20)
+    ).length;
+  }, [products]);
+
+  /* ============================
+        DATE
+  ============================ */
+
+  const today = new Date();
+
+  const formattedDate = today.toLocaleDateString(
+    "en-GB",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
   );
 
-  const totalStock = products.reduce(
-    (sum, item) => sum + Number(item.stock || 0),
-    0
-  );
+  /* ============================
+        STATUS
+  ============================ */
 
-  const inventoryValue = products.reduce(
-    (sum, item) =>
-      sum +
-      Number(item.stock || 0) *
-        Number(item.price || 0),
-    0
-  );
+  function getProductStatus(product: any) {
+    const stock = Number(product.stock || 0);
+    const reorderLevel = Number(
+      product.reorder_level || 20
+    );
 
-  const lowStockCount = products.filter(
-    (item) =>
-      Number(item.stock) <=
-      Number(item.reorder_level || 20)
-  ).length;
+    if (stock === 0) {
+      return {
+        label: "Out of Stock",
+        className:
+          "bg-red-500/10 text-red-400 border-red-500/20",
+        dot: "bg-red-400",
+      };
+    }
+
+    if (stock <= reorderLevel) {
+      return {
+        label: "Low Stock",
+        className:
+          "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        dot: "bg-yellow-400",
+      };
+    }
+
+    return {
+      label: "Available",
+      className:
+        "bg-green-500/10 text-green-400 border-green-500/20",
+      dot: "bg-green-400",
+    };
+  }
+
+  /* ============================
+        LOADING
+  ============================ */
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#08111f]">
-
+      <div className="min-h-screen bg-[#08111f] flex items-center justify-center">
         <div className="text-center">
+          <div className="w-14 h-14 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto" />
 
-          <div className="w-14 h-14 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-
-          <p className="mt-6 text-slate-300 text-lg">
+          <p className="mt-6 text-slate-300 text-lg font-medium">
             Loading Products...
           </p>
 
+          <p className="text-slate-500 mt-2">
+            Preparing your product inventory
+          </p>
         </div>
-
       </div>
     );
   }
 
   return (
+    <div className="min-h-screen bg-[#08111f] -m-6 p-6 md:p-8">
 
-    <div className="min-h-screen bg-[#08111f] -m-6 p-8">
+      {/* =====================================================
+            HEADER
+      ===================================================== */}
 
-      {/* Header */}
+      <div className="relative overflow-hidden rounded-[32px] border border-slate-700 bg-gradient-to-br from-[#0d1b35] via-[#101f3d] to-[#172b52] p-7 md:p-9 shadow-2xl mb-8">
 
-      <div className="flex items-center justify-between mb-8">
+        <div className="absolute -right-20 -top-20 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl" />
 
-        <div>
+        <div className="absolute -left-20 -bottom-20 w-72 h-72 rounded-full bg-yellow-500/5 blur-3xl" />
 
-          <h1 className="text-4xl font-bold text-white">
-            Product Management
-          </h1>
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-7">
 
-          <p className="text-slate-400 mt-2 text-lg">
-            Manage bakery products and live inventory.
-          </p>
+          <div>
+
+            <div className="flex items-center gap-3 mb-4">
+
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-400/20 flex items-center justify-center">
+
+                <Package
+                  size={25}
+                  className="text-blue-400"
+                />
+
+              </div>
+
+              <span className="text-blue-400 font-semibold tracking-wide">
+                INVENTORY MANAGEMENT
+              </span>
+
+            </div>
+
+            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">
+              Products
+            </h1>
+
+            <p className="text-slate-400 mt-3 text-base md:text-lg">
+              Manage bakery products, pricing and finished-goods inventory.
+            </p>
+
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+
+            <div className="rounded-2xl bg-slate-950/50 border border-slate-700 px-5 py-4">
+
+              <div className="flex items-center gap-3">
+
+                <CalendarDays
+                  size={20}
+                  className="text-yellow-400"
+                />
+
+                <div>
+
+                  <p className="text-xs text-slate-500 uppercase tracking-wider">
+                    Today
+                  </p>
+
+                  <p className="text-white font-semibold mt-1">
+                    {formattedDate}
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <button
+              onClick={() => fetchProducts(true)}
+              disabled={refreshing}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 px-6 py-4 text-slate-950 font-bold transition shadow-lg shadow-yellow-500/10"
+            >
+
+              <RefreshCw
+                size={19}
+                className={
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              />
+
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+
+            </button>
+
+          </div>
 
         </div>
 
-        <button className="bg-yellow-500 hover:bg-yellow-400 transition px-7 py-4 rounded-2xl font-bold text-slate-900 shadow-xl">
-
-          + Add Product
-
-        </button>
-
       </div>
 
-      {/* KPI Cards */}
+      {/* =====================================================
+            KPI CARDS
+      ===================================================== */}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-7 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
 
-        {/* Products */}
+        {/* TOTAL PRODUCTS */}
 
-        <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 p-7 shadow-2xl">
+        <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl">
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
 
             <div>
 
-              <p className="text-slate-400">
+              <p className="text-slate-400 text-sm font-medium">
                 Total Products
               </p>
 
-              <h2 className="text-5xl font-bold text-white mt-3">
+              <h2 className="text-4xl font-black text-white mt-3">
                 {products.length}
               </h2>
 
-              <p className="text-green-400 mt-4 text-sm">
-                Active Catalog
+              <p className="text-green-400 text-sm mt-3">
+                Active product catalog
               </p>
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center text-3xl">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
 
-              📦
+              <Package
+                size={24}
+                className="text-blue-400"
+              />
 
             </div>
 
@@ -134,31 +335,34 @@ export default function ProductsPage() {
 
         </div>
 
-        {/* Stock */}
+        {/* TOTAL STOCK */}
 
-        <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 p-7 shadow-2xl">
+        <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl">
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
 
             <div>
 
-              <p className="text-slate-400">
+              <p className="text-slate-400 text-sm font-medium">
                 Total Stock
               </p>
 
-              <h2 className="text-5xl font-bold text-white mt-3">
+              <h2 className="text-4xl font-black text-white mt-3">
                 {totalStock.toLocaleString()}
               </h2>
 
-              <p className="text-green-400 mt-4 text-sm">
-                Live Inventory
+              <p className="text-green-400 text-sm mt-3">
+                Finished goods available
               </p>
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center text-3xl">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center">
 
-              📈
+              <Boxes
+                size={24}
+                className="text-green-400"
+              />
 
             </div>
 
@@ -166,31 +370,34 @@ export default function ProductsPage() {
 
         </div>
 
-        {/* Inventory */}
+        {/* INVENTORY VALUE */}
 
-        <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 p-7 shadow-2xl">
+        <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl">
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
 
             <div>
 
-              <p className="text-slate-400">
+              <p className="text-slate-400 text-sm font-medium">
                 Inventory Value
               </p>
 
-              <h2 className="text-4xl font-bold text-white mt-3">
+              <h2 className="text-3xl md:text-4xl font-black text-white mt-3">
                 ₦{inventoryValue.toLocaleString()}
               </h2>
 
-              <p className="text-purple-400 mt-4 text-sm">
-                Current Value
+              <p className="text-purple-400 text-sm mt-3">
+                Current stock value
               </p>
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center text-3xl">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center">
 
-              ₦
+              <Banknote
+                size={24}
+                className="text-purple-400"
+              />
 
             </div>
 
@@ -198,31 +405,34 @@ export default function ProductsPage() {
 
         </div>
 
-        {/* Low Stock */}
+        {/* LOW STOCK */}
 
-        <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 p-7 shadow-2xl">
+        <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 shadow-xl">
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
 
             <div>
 
-              <p className="text-slate-400">
+              <p className="text-slate-400 text-sm font-medium">
                 Low Stock
               </p>
 
-              <h2 className="text-5xl font-bold text-white mt-3">
+              <h2 className="text-4xl font-black text-white mt-3">
                 {lowStockCount}
               </h2>
 
-              <p className="text-orange-400 mt-4 text-sm">
-                Needs Attention
+              <p className="text-yellow-400 text-sm mt-3">
+                Products needing attention
               </p>
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center text-3xl">
+            <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center">
 
-              ⚠️
+              <AlertTriangle
+                size={24}
+                className="text-yellow-400"
+              />
 
             </div>
 
@@ -232,47 +442,57 @@ export default function ProductsPage() {
 
       </div>
 
-            {/* Search Section */}
+      {/* =====================================================
+            SEARCH
+      ===================================================== */}
 
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-6 mb-8">
+      <div className="rounded-3xl border border-slate-700 bg-slate-900/80 shadow-xl p-5 mb-8">
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
 
           <div className="relative flex-1">
 
-            <svg
-              className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <Search
+              size={21}
+              className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500"
+            />
 
             <input
               type="text"
-              placeholder="Search products..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-2xl py-4 pl-14 pr-5 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition"
+              onChange={(event) =>
+                setSearch(event.target.value)
+              }
+              placeholder="Search by product name or SKU..."
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800/80 py-4 pl-14 pr-5 text-white placeholder:text-slate-500 outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/10 transition"
             />
 
           </div>
 
+          <div className="rounded-2xl bg-slate-800 border border-slate-700 px-5 py-4">
+
+            <p className="text-xs text-slate-500 uppercase tracking-wider">
+              Showing
+            </p>
+
+            <p className="text-white font-bold mt-1">
+              {filteredProducts.length} of{" "}
+              {products.length} Products
+            </p>
+
+          </div>
+
         </div>
 
       </div>
 
-      {/* Product Listing */}
+      {/* =====================================================
+            PRODUCT TABLE
+      ===================================================== */}
 
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden">
+      <div className="rounded-3xl border border-slate-700 bg-slate-900/80 shadow-2xl overflow-hidden">
 
-        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-700">
+        <div className="px-6 md:px-8 py-6 border-b border-slate-700 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
           <div>
 
@@ -281,183 +501,267 @@ export default function ProductsPage() {
             </h2>
 
             <p className="text-slate-400 mt-1">
-              {filteredProducts.length} Products Available
+              Select a product to view its complete information.
             </p>
 
           </div>
 
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="text-sm text-yellow-400 hover:text-yellow-300 font-semibold"
+            >
+              Clear Search
+            </button>
+          )}
+
         </div>
 
-        <table className="w-full">
+        <div className="overflow-x-auto">
 
-          <thead className="bg-slate-800 border-b border-slate-700">
+          <table className="w-full min-w-[900px]">
 
-            <tr>
+            <thead>
 
-              <th className="px-8 py-5 text-left text-slate-300 font-semibold">
-                Product
-              </th>
+              <tr className="bg-slate-800/80 border-b border-slate-700">
 
-              <th className="px-8 py-5 text-left text-slate-300 font-semibold">
-                Stock
-              </th>
+                <th className="px-7 py-5 text-left text-xs uppercase tracking-wider text-slate-400 font-bold">
+                  Product
+                </th>
 
-              <th className="px-8 py-5 text-left text-slate-300 font-semibold">
-                Price
-              </th>
+                <th className="px-7 py-5 text-left text-xs uppercase tracking-wider text-slate-400 font-bold">
+                  SKU
+                </th>
 
-              <th className="px-8 py-5 text-left text-slate-300 font-semibold">
-                Status
-              </th>
+                <th className="px-7 py-5 text-left text-xs uppercase tracking-wider text-slate-400 font-bold">
+                  Stock
+                </th>
 
-            </tr>
+                <th className="px-7 py-5 text-left text-xs uppercase tracking-wider text-slate-400 font-bold">
+                  Price
+                </th>
 
-          </thead>
+                <th className="px-7 py-5 text-left text-xs uppercase tracking-wider text-slate-400 font-bold">
+                  Status
+                </th>
 
-          <tbody>
+                <th className="px-7 py-5 text-right text-xs uppercase tracking-wider text-slate-400 font-bold">
+                  Action
+                </th>
 
-            {filteredProducts.map((product) => (
+              </tr>
 
-              <tr
-                key={product.id}
-                className="border-b border-slate-800 hover:bg-slate-800/70 transition duration-300"
-              >
-                                <td className="px-8 py-6">
+            </thead>
 
-                  <div className="flex items-center gap-5">
+            <tbody>
 
-                    <div className="w-20 h-20 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden">
+              {filteredProducts.map((product) => {
 
-                      <img
-                        src={
-                          product.image_url ||
-                          "https://via.placeholder.com/80"
-                        }
-                        alt={product.name}
-                        className="w-16 h-16 object-contain"
-                      />
+                const status =
+                  getProductStatus(product);
 
-                    </div>
+                return (
 
-                    <div>
+<tr
+  key={product.id}
+  onClick={() =>
+    router.push(
+      `/products/${product.id}?from=products`
+    )
+  }
+                    className="group border-b border-slate-800 hover:bg-slate-800/50 transition cursor-pointer"
+                  >
 
-                      <h3 className="text-lg font-bold text-white">
-                        {product.name}
+                    {/* PRODUCT */}
+
+                    <td className="px-7 py-6">
+
+                      <div className="flex items-center gap-4">
+
+                        <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+
+                          {product.image_url ? (
+
+                            <img
+                              src={product.image_url}
+                              alt={product.name || "Product"}
+                              className="w-14 h-14 object-contain"
+                            />
+
+                          ) : (
+
+                            <Package
+                              size={28}
+                              className="text-slate-600"
+                            />
+
+                          )}
+
+                        </div>
+
+                        <div>
+
+                          <h3 className="text-base font-bold text-white group-hover:text-yellow-400 transition">
+                            {product.name ||
+                              "Unnamed Product"}
+                          </h3>
+
+                          <p className="text-xs text-slate-500 mt-1">
+                            Product ID: {product.id}
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    </td>
+
+                    {/* SKU */}
+
+                    <td className="px-7 py-6">
+
+                      <span className="text-slate-300 font-medium">
+                        {product.sku || "N/A"}
+                      </span>
+
+                    </td>
+
+                    {/* STOCK */}
+
+                    <td className="px-7 py-6">
+
+                      <div>
+
+                        <span className="text-lg font-bold text-white">
+                          {Number(
+                            product.stock || 0
+                          ).toLocaleString()}
+                        </span>
+
+                        <p className="text-xs text-slate-500 mt-1">
+                          units available
+                        </p>
+
+                      </div>
+
+                    </td>
+
+                    {/* PRICE */}
+
+                    <td className="px-7 py-6">
+
+                      <span className="text-lg font-bold text-green-400">
+                        ₦
+                        {Number(
+                          product.price || 0
+                        ).toLocaleString()}
+                      </span>
+
+                    </td>
+
+                    {/* STATUS */}
+
+                    <td className="px-7 py-6">
+
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold ${status.className}`}
+                      >
+
+                        <span
+                          className={`w-2 h-2 rounded-full ${status.dot}`}
+                        />
+
+                        {status.label}
+
+                      </span>
+
+                    </td>
+
+                    {/* ACTION */}
+
+                    <td className="px-7 py-6 text-right">
+
+<button
+  onClick={(event) => {
+    event.stopPropagation();
+
+    router.push(
+      `/products/${product.id}?from=products`
+    );
+  }}
+                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-3 text-sm font-bold text-white transition"
+                      >
+
+                        View Product
+
+                        <ChevronRight
+                          size={17}
+                        />
+
+                      </button>
+
+                    </td>
+
+                  </tr>
+
+                );
+              })}
+
+              {/* EMPTY */}
+
+              {filteredProducts.length === 0 && (
+
+                <tr>
+
+                  <td
+                    colSpan={6}
+                    className="py-24 text-center"
+                  >
+
+                    <div className="flex flex-col items-center">
+
+                      <div className="w-20 h-20 rounded-3xl bg-slate-800 border border-slate-700 flex items-center justify-center">
+
+                        <Search
+                          size={34}
+                          className="text-slate-600"
+                        />
+
+                      </div>
+
+                      <h3 className="text-2xl font-bold text-white mt-6">
+                        No Products Found
                       </h3>
 
-                      <p className="text-sm text-slate-400 mt-1">
-                        {product.sku || "No SKU"}
+                      <p className="text-slate-400 mt-2">
+                        No products match "{search}".
                       </p>
 
+                      <button
+                        onClick={() =>
+                          setSearch("")
+                        }
+                        className="mt-6 rounded-xl bg-yellow-500 hover:bg-yellow-400 px-5 py-3 text-sm font-bold text-slate-950 transition"
+                      >
+                        Clear Search
+                      </button>
+
                     </div>
 
-                  </div>
+                  </td>
 
-                </td>
+                </tr>
 
-                <td className="px-8 py-6">
+              )}
 
-                  <span className="text-xl font-bold text-green-400">
+            </tbody>
 
-                    {Number(product.stock).toLocaleString()}
+          </table>
 
-                  </span>
-
-                  <p className="text-xs text-slate-500 mt-1">
-                    Units Available
-                  </p>
-
-                </td>
-
-                <td className="px-8 py-6">
-
-                  <span className="text-xl font-bold text-white">
-
-                    ₦{Number(product.price).toLocaleString()}
-
-                  </span>
-
-                </td>
-
-                <td className="px-8 py-6">
-
-                  {Number(product.stock) === 0 ? (
-
-                    <span className="inline-flex items-center gap-2 rounded-full bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 text-sm font-semibold">
-
-                      <span className="w-2 h-2 rounded-full bg-red-400"></span>
-
-                      Out of Stock
-
-                    </span>
-
-                  ) : Number(product.stock) <= Number(product.reorder_level || 20) ? (
-
-                    <span className="inline-flex items-center gap-2 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 px-4 py-2 text-sm font-semibold">
-
-                      <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
-
-                      Low Stock
-
-                    </span>
-
-                  ) : (
-
-                    <span className="inline-flex items-center gap-2 rounded-full bg-green-500/20 border border-green-500/30 text-green-300 px-4 py-2 text-sm font-semibold">
-
-                      <span className="w-2 h-2 rounded-full bg-green-400"></span>
-
-                      Available
-
-                    </span>
-
-                  )}
-
-                </td>
-
-              </tr>
-
-            ))}
-
-            {filteredProducts.length === 0 && (
-
-              <tr>
-
-                <td
-                  colSpan={4}
-                  className="py-20 text-center"
-                >
-
-                  <div className="flex flex-col items-center">
-
-                    <div className="text-6xl mb-4">
-                      📦
-                    </div>
-
-                    <h3 className="text-2xl font-bold text-white">
-                      No Products Found
-                    </h3>
-
-                    <p className="text-slate-400 mt-2">
-                      Try searching for another product.
-                    </p>
-
-                  </div>
-
-                </td>
-
-              </tr>
-
-            )}
-
-          </tbody>
-
-        </table>
+        </div>
 
       </div>
 
     </div>
-
   );
-
 }

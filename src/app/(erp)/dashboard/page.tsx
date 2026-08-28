@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 
@@ -12,6 +13,8 @@ import {
   Wheat,
   Trophy,
   Crown,
+  RefreshCw,
+  Package,
 } from "lucide-react";
 
 import {
@@ -47,6 +50,8 @@ type CustomerSalesSummary = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
+
   /* ============================
         DATABASE STATES
   ============================ */
@@ -62,74 +67,83 @@ export default function DashboardPage() {
   const [showOrderModal, setShowOrderModal] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   /* ============================
         FETCH DASHBOARD
   ============================ */
 
-  async function fetchDashboard() {
-    try {
-      const [
-        salesRes,
-        productRes,
-        inventoryRes,
-        expenseRes,
-        ordersRes,
-        debtorRes,
-      ] = await Promise.all([
-        supabase.from("sales").select("*"),
+  const fetchDashboard = useCallback(
+    async (showRefresh = false) => {
+      try {
+        if (showRefresh) {
+          setRefreshing(true);
+        }
 
-        supabase.from("products").select("*"),
+        const [
+          salesRes,
+          productRes,
+          inventoryRes,
+          expenseRes,
+          ordersRes,
+          debtorRes,
+        ] = await Promise.all([
+          supabase.from("sales").select("*"),
 
-        supabase.from("inventory").select("*"),
+          supabase.from("products").select("*"),
 
-        supabase.from("expenses").select("*"),
+          supabase.from("inventory").select("*"),
 
-        supabase
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(10),
+          supabase.from("expenses").select("*"),
 
-        supabase.from("debtors").select("*"),
-      ]);
+          supabase
+            .from("orders")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(10),
 
-      if (salesRes.error) {
-        console.error("Sales fetch error:", salesRes.error);
+          supabase.from("debtors").select("*"),
+        ]);
+
+        if (salesRes.error) {
+          console.error("Sales fetch error:", salesRes.error);
+        }
+
+        if (productRes.error) {
+          console.error("Products fetch error:", productRes.error);
+        }
+
+        if (inventoryRes.error) {
+          console.error("Inventory fetch error:", inventoryRes.error);
+        }
+
+        if (expenseRes.error) {
+          console.error("Expenses fetch error:", expenseRes.error);
+        }
+
+        if (ordersRes.error) {
+          console.error("Orders fetch error:", ordersRes.error);
+        }
+
+        if (debtorRes.error) {
+          console.error("Debtors fetch error:", debtorRes.error);
+        }
+
+        setSales(salesRes.data || []);
+        setProducts(productRes.data || []);
+        setInventory(inventoryRes.data || []);
+        setExpenses(expenseRes.data || []);
+        setRecentOrders(ordersRes.data || []);
+        setDebtors(debtorRes.data || []);
+      } catch (error) {
+        console.error("Dashboard fetch error:", error);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      if (productRes.error) {
-        console.error("Products fetch error:", productRes.error);
-      }
-
-      if (inventoryRes.error) {
-        console.error("Inventory fetch error:", inventoryRes.error);
-      }
-
-      if (expenseRes.error) {
-        console.error("Expenses fetch error:", expenseRes.error);
-      }
-
-      if (ordersRes.error) {
-        console.error("Orders fetch error:", ordersRes.error);
-      }
-
-      if (debtorRes.error) {
-        console.error("Debtors fetch error:", debtorRes.error);
-      }
-
-      setSales(salesRes.data || []);
-      setProducts(productRes.data || []);
-      setInventory(inventoryRes.data || []);
-      setExpenses(expenseRes.data || []);
-      setRecentOrders(ordersRes.data || []);
-      setDebtors(debtorRes.data || []);
-    } catch (error) {
-      console.error("Dashboard fetch error:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    []
+  );
 
   /* ============================
         INITIAL LOAD
@@ -137,17 +151,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [fetchDashboard]);
 
   /* ============================
-        REALTIME AUTO REFRESH
+        REALTIME
   ============================ */
 
   useEffect(() => {
     const channel = supabase
       .channel("dashboard-realtime")
 
-      /* SALES */
       .on(
         "postgres_changes",
         {
@@ -155,13 +168,11 @@ export default function DashboardPage() {
           schema: "public",
           table: "sales",
         },
-        (payload) => {
-          console.log("Realtime sales update:", payload);
+        () => {
           fetchDashboard();
         }
       )
 
-      /* PRODUCTS */
       .on(
         "postgres_changes",
         {
@@ -169,13 +180,11 @@ export default function DashboardPage() {
           schema: "public",
           table: "products",
         },
-        (payload) => {
-          console.log("Realtime products update:", payload);
+        () => {
           fetchDashboard();
         }
       )
 
-      /* INVENTORY */
       .on(
         "postgres_changes",
         {
@@ -183,13 +192,11 @@ export default function DashboardPage() {
           schema: "public",
           table: "inventory",
         },
-        (payload) => {
-          console.log("Realtime inventory update:", payload);
+        () => {
           fetchDashboard();
         }
       )
 
-      /* EXPENSES */
       .on(
         "postgres_changes",
         {
@@ -197,13 +204,11 @@ export default function DashboardPage() {
           schema: "public",
           table: "expenses",
         },
-        (payload) => {
-          console.log("Realtime expenses update:", payload);
+        () => {
           fetchDashboard();
         }
       )
 
-      /* DEBTORS */
       .on(
         "postgres_changes",
         {
@@ -211,13 +216,11 @@ export default function DashboardPage() {
           schema: "public",
           table: "debtors",
         },
-        (payload) => {
-          console.log("Realtime debtor update:", payload);
+        () => {
           fetchDashboard();
         }
       )
 
-      /* CUSTOMER ORDERS */
       .on(
         "postgres_changes",
         {
@@ -225,8 +228,7 @@ export default function DashboardPage() {
           schema: "public",
           table: "orders",
         },
-        (payload) => {
-          console.log("Realtime order update:", payload);
+        () => {
           fetchDashboard();
         }
       )
@@ -238,7 +240,7 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchDashboard]);
 
   /* ============================
         KPI CALCULATIONS
@@ -320,7 +322,9 @@ export default function DashboardPage() {
 
     productSales[productName].quantity += Number(sale.quantity || 0);
 
-    productSales[productName].revenue += Number(sale.total_amount || 0);
+    productSales[productName].revenue += Number(
+      sale.total_amount || 0
+    );
   });
 
   const bestSellingProducts = Object.entries(productSales) as [
@@ -352,7 +356,9 @@ export default function DashboardPage() {
       };
     }
 
-    customerSales[customerName].total += Number(sale.total_amount || 0);
+    customerSales[customerName].total += Number(
+      sale.total_amount || 0
+    );
 
     customerSales[customerName].orders += 1;
   });
@@ -377,9 +383,17 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#08111f]">
-        <h2 className="text-white text-2xl font-bold">
-          Loading Dashboard...
-        </h2>
+        <div className="text-center">
+          <div className="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+
+          <h2 className="text-white text-2xl font-bold mt-6">
+            Loading Dashboard...
+          </h2>
+
+          <p className="text-slate-500 mt-2">
+            Connecting to live business data
+          </p>
+        </div>
       </div>
     );
   }
@@ -431,24 +445,44 @@ export default function DashboardPage() {
 
         </div>
 
-        <div className="bg-slate-900 border border-slate-700 rounded-3xl px-8 py-6 shadow-2xl">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
 
-          <p className="text-slate-400">
-            Today
-          </p>
+          {/* REFRESH BUTTON */}
 
-          <h2 className="text-white text-2xl font-bold mt-1">
-            {new Date().toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </h2>
+          <button
+            type="button"
+            onClick={() => fetchDashboard(true)}
+            disabled={refreshing}
+            className="flex items-center justify-center gap-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-4 rounded-2xl transition shadow-xl"
+          >
+            <RefreshCw
+              size={19}
+              className={refreshing ? "animate-spin" : ""}
+            />
 
-          <p className="text-yellow-400 mt-2 font-semibold">
-            CEO Analytics Center
-          </p>
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
+
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl px-8 py-6 shadow-2xl">
+
+            <p className="text-slate-400">
+              Today
+            </p>
+
+            <h2 className="text-white text-2xl font-bold mt-1">
+              {new Date().toLocaleDateString("en-GB", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </h2>
+
+            <p className="text-yellow-400 mt-2 font-semibold">
+              CEO Analytics Center
+            </p>
+
+          </div>
 
         </div>
 
@@ -644,7 +678,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-10">
 
-        {/* REVENUE ANALYTICS */}
+        {/* REVENUE */}
 
         <div className="xl:col-span-5 bg-slate-900 border border-slate-700 rounded-3xl p-5 shadow-2xl">
 
@@ -670,7 +704,10 @@ export default function DashboardPage() {
 
           <div className="h-[220px]">
 
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+            >
 
               <AreaChart data={revenueChart}>
 
@@ -788,7 +825,7 @@ export default function DashboardPage() {
 
         {/* PRODUCT STOCK */}
 
-        <div className="xl:col-span-4 rounded-3xl bg-[#111C44] border border-slate-700 p-8 shadow-2xl">
+        <div className="xl:col-span-4 rounded-3xl bg-[#111C44] border border-slate-700 p-8 shadow-2xl overflow-hidden">
 
           <div className="mb-6">
 
@@ -802,37 +839,72 @@ export default function DashboardPage() {
 
           </div>
 
-          <div className="h-[170px]">
+          {/* FIXED PIE CONTAINER */}
 
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full h-[190px] flex items-center justify-center overflow-hidden">
 
-              <PieChart>
+            {stockChart.length > 0 ? (
 
-                <Pie
-                  data={stockChart}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={70}
-                  outerRadius={105}
-                  paddingAngle={4}
-                >
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
 
-                  {stockChart.map((entry, index) => (
+                <PieChart>
 
-                    <Cell
-                      key={index}
-                      fill={COLORS[index % COLORS.length]}
-                    />
+                  <Pie
+                    data={stockChart}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={52}
+                    outerRadius={78}
+                    paddingAngle={3}
+                    startAngle={90}
+                    endAngle={-270}
+                  >
 
-                  ))}
+                    {stockChart.map((entry, index) => (
 
-                </Pie>
+                      <Cell
+                        key={`stock-${entry.name}-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
 
-                <Tooltip />
+                    ))}
 
-              </PieChart>
+                  </Pie>
 
-            </ResponsiveContainer>
+                  <Tooltip
+                    contentStyle={{
+                      background: "#0F172A",
+                      border: "1px solid #334155",
+                      borderRadius: "12px",
+                      color: "#fff",
+                    }}
+                  />
+
+                </PieChart>
+
+              </ResponsiveContainer>
+
+            ) : (
+
+              <div className="flex flex-col items-center justify-center">
+
+                <Package
+                  size={42}
+                  className="text-slate-600"
+                />
+
+                <p className="text-slate-500 mt-3">
+                  No Stock Data
+                </p>
+
+              </div>
+
+            )}
 
           </div>
 
@@ -878,27 +950,27 @@ export default function DashboardPage() {
               .map((item, index) => (
 
                 <div
-                  key={index}
+                  key={item.name}
                   className="flex justify-between items-center rounded-xl bg-[#0F172A] px-4 py-2"
                 >
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
 
                     <div
-                      className="h-3 w-3 rounded-full"
+                      className="h-3 w-3 rounded-full flex-shrink-0"
                       style={{
                         background:
                           COLORS[index % COLORS.length],
                       }}
                     />
 
-                    <span className="text-white font-medium">
+                    <span className="text-white font-medium truncate">
                       {item.name}
                     </span>
 
                   </div>
 
-                  <span className="text-blue-400 font-bold">
+                  <span className="text-blue-400 font-bold ml-3">
                     {item.value}
                   </span>
 
@@ -946,7 +1018,7 @@ export default function DashboardPage() {
 
               </div>
 
-              <div>
+              <div className="min-w-0">
 
                 <h3 className="text-2xl font-bold text-white">
                   {bestProduct?.name || "No Sales"}
@@ -1169,9 +1241,13 @@ export default function DashboardPage() {
 
               return (
 
-                <div
-                  key={product.id}
-                  className="bg-[#111c2d] border border-slate-700 rounded-3xl overflow-hidden hover:border-blue-500 transition duration-300 hover:-translate-y-2"
+<button
+  type="button"
+  key={product.id}
+  onClick={() =>
+    router.push(`/products/${product.id}?from=dashboard`)
+  }
+                  className="text-left bg-[#111c2d] border border-slate-700 rounded-3xl overflow-hidden hover:border-blue-500 transition duration-300 hover:-translate-y-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
 
                   <div className="bg-slate-800 h-44 flex items-center justify-center">
@@ -1293,9 +1369,13 @@ export default function DashboardPage() {
 
                     </div>
 
+                    <div className="mt-4 text-blue-400 text-sm font-semibold">
+                      Click to view product →
+                    </div>
+
                   </div>
 
-                </div>
+                </button>
 
               );
             })}
@@ -1321,7 +1401,7 @@ export default function DashboardPage() {
             </h2>
 
             <p className="text-slate-400 mt-2">
-              Latest 10 Orders From The Mobile App
+              Latest 10 Orders
             </p>
 
           </div>
@@ -1350,7 +1430,7 @@ export default function DashboardPage() {
             </h2>
 
             <p className="text-slate-400 mt-2">
-              Orders from customers will automatically appear here.
+              Customer orders will automatically appear here.
             </p>
 
           </div>
@@ -1445,10 +1525,12 @@ export default function DashboardPage() {
                     </td>
 
                     <td className="text-right font-bold text-green-400">
+
                       ₦
                       {Number(
                         order.total_amount || 0
                       ).toLocaleString()}
+
                     </td>
 
                     <td className="text-center text-slate-400">
@@ -1464,6 +1546,7 @@ export default function DashboardPage() {
                     <td className="text-center">
 
                       <button
+                        type="button"
                         onClick={() => {
                           setSelectedOrder(order);
                           setShowOrderModal(true);
@@ -1495,7 +1578,7 @@ export default function DashboardPage() {
 
       {showOrderModal && selectedOrder && (
 
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
 
           <div className="bg-slate-900 w-[650px] max-w-[95%] rounded-3xl border border-slate-700 p-8">
 
@@ -1506,6 +1589,7 @@ export default function DashboardPage() {
               </h2>
 
               <button
+                type="button"
                 onClick={() => setShowOrderModal(false)}
                 className="text-slate-400 hover:text-white text-2xl"
               >
@@ -1584,6 +1668,7 @@ export default function DashboardPage() {
             <div className="mt-8 flex justify-end">
 
               <button
+                type="button"
                 onClick={() => setShowOrderModal(false)}
                 className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl text-white"
               >
