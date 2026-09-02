@@ -7,9 +7,6 @@ interface ProductionFormProps {
   quantityProduced: string;
   setQuantityProduced: (value: string) => void;
 
-  wasteQuantity: string;
-  setWasteQuantity: (value: string) => void;
-
   doughBatches: string;
   setDoughBatches: (value: string) => void;
 
@@ -26,8 +23,6 @@ export default function ProductionForm({
   setSelectedProduct,
   quantityProduced,
   setQuantityProduced,
-  wasteQuantity,
-  setWasteQuantity,
   doughBatches,
   setDoughBatches,
   shift,
@@ -82,20 +77,6 @@ export default function ProductionForm({
           disabled={saving}
           onChange={(e) =>
             setQuantityProduced(e.target.value)
-          }
-          className="w-full rounded-2xl border-2 border-slate-200 p-4 disabled:bg-slate-100"
-        />
-
-        {/* WASTE */}
-
-        <input
-          type="number"
-          min="0"
-          placeholder="Waste Pieces"
-          value={wasteQuantity}
-          disabled={saving}
-          onChange={(e) =>
-            setWasteQuantity(e.target.value)
           }
           className="w-full rounded-2xl border-2 border-slate-200 p-4 disabled:bg-slate-100"
         />
@@ -160,21 +141,21 @@ export default function ProductionForm({
 
         {/* UPLOAD */}
 
-<button
-  type="button"
-  disabled={saving}
-  onClick={() => {
-    if (saving) return;
-    saveProduction();
-  }}
-  className={`w-full rounded-2xl py-5 text-lg font-black transition ${
-    saving
-      ? "bg-slate-500 text-white cursor-not-allowed"
-      : "bg-blue-950 hover:bg-blue-900 text-white"
-  }`}
->
-  {saving ? "Uploading..." : "Upload Production"}
-</button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => {
+            if (saving) return;
+            saveProduction();
+          }}
+          className={`w-full rounded-2xl py-5 text-lg font-black transition ${
+            saving
+              ? "bg-slate-500 text-white cursor-not-allowed"
+              : "bg-blue-950 hover:bg-blue-900 text-white"
+          }`}
+        >
+          {saving ? "Uploading..." : "Upload Production"}
+        </button>
 
       </div>
 

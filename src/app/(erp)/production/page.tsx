@@ -6,13 +6,9 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 
 import { supabase } from "@/lib/supabase";
 
-import ProductionStats from "@/components/production/ProductionStats";
-
 import ProductionForm from "@/components/production/ProductionForm";
 
 import RecipePreview from "@/components/production/RecipePreview";
-
-import ProductionHistory from "@/components/production/ProductionHistory";
 
 export default function ProductionPage() {
 
@@ -20,8 +16,7 @@ export default function ProductionPage() {
      STATES
   ========================== */
 
-  const [products, setProducts] =
-    useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
 
   const [productionLogs, setProductionLogs] =
     useState<any[]>([]);
@@ -33,13 +28,9 @@ export default function ProductionPage() {
   const [selectedProduct, setSelectedProduct] =
     useState("");
 
-  const [shift, setShift] =
-    useState("Morning");
+  const [shift, setShift] = useState("Morning");
 
   const [quantityProduced, setQuantityProduced] =
-    useState("");
-
-  const [wasteQuantity, setWasteQuantity] =
     useState("");
 
   const [doughBatches, setDoughBatches] =
@@ -58,6 +49,19 @@ export default function ProductionPage() {
     useState(10);
 
   /* =========================
+     STORE CONFIRMATION
+  ========================== */
+
+  const [confirmationReceived, setConfirmationReceived] =
+    useState("");
+
+  const [confirmationDamage, setConfirmationDamage] =
+    useState("");
+
+  const [confirming, setConfirming] =
+    useState(false);
+
+  /* =========================
      KPI DATE FILTER
   ========================== */
 
@@ -65,6 +69,7 @@ export default function ProductionPage() {
     const date = new Date();
 
     const year = date.getFullYear();
+
     const month = String(
       date.getMonth() + 1
     ).padStart(2, "0");
@@ -131,9 +136,7 @@ export default function ProductionPage() {
   ========================== */
 
   useEffect(() => {
-
     fetchData();
-
   }, []);
 
   /* =========================
@@ -141,7 +144,6 @@ export default function ProductionPage() {
   ========================== */
 
   useEffect(() => {
-
     const channel =
       supabase
         .channel("production-page-realtime")
@@ -154,20 +156,15 @@ export default function ProductionPage() {
             table: "production_logs",
           },
           async () => {
-
             await fetchData();
-
           }
         )
 
         .subscribe();
 
     return () => {
-
       supabase.removeChannel(channel);
-
     };
-
   }, []);
 
   async function fetchData() {
@@ -176,29 +173,39 @@ export default function ProductionPage() {
 
     const {
       data: productsData,
+      error: productsError,
     } = await supabase
-
       .from("products")
-
       .select("*")
-
       .order("created_at", {
         ascending: false,
       });
+
+    if (productsError) {
+      console.error(
+        "Products fetch error:",
+        productsError
+      );
+    }
 
     /* PRODUCTION LOGS */
 
     const {
       data: productionData,
+      error: productionError,
     } = await supabase
-
       .from("production_logs")
-
       .select("*")
-
       .order("created_at", {
         ascending: false,
       });
+
+    if (productionError) {
+      console.error(
+        "Production logs fetch error:",
+        productionError
+      );
+    }
 
     console.log(
       "Production Logs:",
@@ -251,7 +258,6 @@ export default function ProductionPage() {
       setRefreshing(false);
 
     }
-
   }
 
   /* =========================
@@ -279,10 +285,6 @@ export default function ProductionPage() {
 
     const produced = Number(
       quantityProduced || 0
-    );
-
-    const waste = Number(
-      wasteQuantity || 0
     );
 
     if (produced <= 0) {
@@ -488,7 +490,7 @@ export default function ProductionPage() {
 
       /* =========================
          AUTOMATIC MATERIAL CALCULATIONS
-         BASED ON DOUGH BATCHES
+         DO NOT CHANGE
       ========================== */
 
       const flourNeeded =
@@ -743,6 +745,9 @@ export default function ProductionPage() {
 
       /* =========================
          1. INSERT PRODUCTION LOG
+         
+         IMPORTANT:
+         No production waste is recorded here.
       ========================== */
 
       const {
@@ -753,19 +758,46 @@ export default function ProductionPage() {
         .insert([
           {
             product_id: product.id,
+
             bread: selectedProduct,
+
             quantity: produced,
-            waste_quantity: waste,
+
+            /*
+             * Kept at zero for compatibility with
+             * existing production_logs records.
+             *
+             * New damage is recorded during
+             * Store Confirmation.
+             */
+            waste_quantity: 0,
+
             dough_batches: batches,
+
             produced_by: "Production Staff",
+
             batch: batchNumber,
+
             shift: shift,
+
             team: "A",
+
             status: "Completed",
+
             production_date:
               new Date()
                 .toISOString()
                 .split("T")[0],
+
+            received_quantity: 0,
+
+            confirmation_damage: 0,
+
+            confirmation_status: "Pending",
+
+            confirmed_at: null,
+
+            confirmed_by: null,
           },
         ])
         .select()
@@ -784,35 +816,21 @@ export default function ProductionPage() {
         productionData
       );
 
-      /* =========================
-         2. UPDATE FINISHED GOODS
-      ========================== */
-
-      const netProduction =
-        produced - waste;
-
-      const {
-        error: productError,
-      } = await supabase
-        .from("products")
-        .update({
-          stock:
-            Number(product.stock || 0) +
-            netProduction,
-        })
-        .eq("id", product.id);
-
-      if (productError) {
-
-        throw new Error(
-          `Product stock update failed: ${productError.message}`
-        );
-
-      }
+      /*
+       * IMPORTANT:
+       *
+       * Finished goods are NOT added to store
+       * stock at this stage.
+       *
+       * Stock will be added only when the
+       * Store Confirmation is completed.
+       */
 
       /* =========================
-         3. AUTOMATICALLY DEDUCT
+         2. AUTOMATICALLY DEDUCT
             ALL PRODUCTION MATERIALS
+         
+         DO NOT CHANGE
       ========================== */
 
       for (
@@ -845,7 +863,9 @@ export default function ProductionPage() {
       }
 
       /* =========================
-         4. INVENTORY HISTORY
+         3. INVENTORY HISTORY
+         
+         DO NOT CHANGE
       ========================== */
 
       const inventoryTransactions =
@@ -887,25 +907,27 @@ export default function ProductionPage() {
       }
 
       /* =========================
-         5. REFRESH DATA
+         4. REFRESH DATA
       ========================== */
 
       await fetchData();
 
       /* =========================
-         6. RESET FORM
+         5. RESET FORM
       ========================== */
 
       setSelectedProduct("");
+
       setQuantityProduced("");
-      setWasteQuantity("");
+
       setDoughBatches("");
+
       setShift("Morning");
 
       showNotification(
         "success",
         "Production Uploaded",
-        `${selectedProduct} production was recorded successfully. Inventory has been automatically deducted.`
+        `${selectedProduct} production was recorded successfully. Raw materials have been automatically deducted. The production is now waiting for Store Confirmation.`
       );
 
     } catch (error: any) {
@@ -927,7 +949,236 @@ export default function ProductionPage() {
       setSaving(false);
 
     }
+  }
 
+  /* =========================
+     STORE CONFIRMATION
+  ========================== */
+
+  const pendingProductions =
+    productionLogs.filter(
+      (log) =>
+        log.confirmation_status !==
+        "Confirmed"
+    );
+
+  function openConfirmation(
+    log: any
+  ) {
+
+    setSelectedProduction(log);
+
+    setConfirmationReceived("");
+
+    setConfirmationDamage("");
+
+    setShowProductionDetails(true);
+  }
+
+  async function confirmProduction() {
+
+    if (confirming) return;
+
+    const log =
+      selectedProduction;
+
+    if (!log) return;
+
+    const produced =
+      Number(
+        log.quantity || 0
+      );
+
+    const received =
+      Number(
+        confirmationReceived || 0
+      );
+
+    const damage =
+      Number(
+        confirmationDamage || 0
+      );
+
+    if (received < 0 || damage < 0) {
+
+      showNotification(
+        "error",
+        "Invalid Confirmation",
+        "Received and damaged quantities cannot be negative."
+      );
+
+      return;
+    }
+
+    if (
+      received +
+      damage >
+      produced
+    ) {
+
+      showNotification(
+        "error",
+        "Invalid Quantities",
+        `Received plus damaged pieces cannot exceed the ${produced.toLocaleString()} pieces produced.`
+      );
+
+      return;
+    }
+
+    const missing =
+      produced -
+      received -
+      damage;
+
+    setConfirming(true);
+
+    try {
+
+      /* =========================
+         GET CURRENT PRODUCT
+      ========================== */
+
+      const {
+        data: product,
+        error: productError,
+      } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", log.product_id)
+        .single();
+
+      if (
+        productError ||
+        !product
+      ) {
+
+        throw new Error(
+          "Finished product was not found."
+        );
+
+      }
+
+      /* =========================
+         ADD ONLY RECEIVED
+         TO FINISHED GOODS STOCK
+      ========================== */
+
+      const currentStock =
+        Number(
+          product.stock || 0
+        );
+
+      const newStock =
+        currentStock +
+        received;
+
+      const {
+        error: stockError,
+      } = await supabase
+        .from("products")
+        .update({
+          stock: newStock,
+        })
+        .eq(
+          "id",
+          product.id
+        );
+
+      if (stockError) {
+
+        throw new Error(
+          `Failed to update ${log.bread} stock: ${stockError.message}`
+        );
+
+      }
+
+      /* =========================
+         UPDATE PRODUCTION LOG
+      ========================== */
+
+      const {
+        error: confirmationError,
+      } = await supabase
+        .from("production_logs")
+        .update({
+          received_quantity:
+            received,
+
+          confirmation_damage:
+            damage,
+
+          confirmation_status:
+            "Confirmed",
+
+          confirmed_at:
+            new Date().toISOString(),
+
+          confirmed_by:
+            "Store",
+        })
+        .eq(
+          "id",
+          log.id
+        );
+
+      if (confirmationError) {
+
+        /*
+         * If the confirmation update fails,
+         * reverse the stock addition so we
+         * don't leave inconsistent finished stock.
+         */
+        await supabase
+          .from("products")
+          .update({
+            stock: currentStock,
+          })
+          .eq(
+            "id",
+            product.id
+          );
+
+        throw new Error(
+          `Production confirmation failed: ${confirmationError.message}`
+        );
+
+      }
+
+      await fetchData();
+
+      setSelectedProduction(null);
+
+      setShowProductionDetails(false);
+
+      setConfirmationReceived("");
+
+      setConfirmationDamage("");
+
+      showNotification(
+        "success",
+        "Production Confirmed",
+        `${log.bread}: ${received.toLocaleString()} received, ${damage.toLocaleString()} damaged and ${missing.toLocaleString()} missing.`
+      );
+
+    } catch (error: any) {
+
+      console.error(
+        "Production confirmation error:",
+        error
+      );
+
+      showNotification(
+        "error",
+        "Confirmation Failed",
+        error?.message ||
+        "Failed to confirm production."
+      );
+
+    } finally {
+
+      setConfirming(false);
+
+    }
   }
 
   /* =========================
@@ -939,8 +1190,8 @@ export default function ProductionPage() {
   ) {
 
     setProductionToDelete(log);
-    setShowDeleteModal(true);
 
+    setShowDeleteModal(true);
   }
 
   async function deleteProduction() {
@@ -968,13 +1219,19 @@ export default function ProductionPage() {
           log.quantity || 0
         );
 
-      const waste =
+      /*
+       * NEW WORKFLOW:
+       *
+       * If confirmed, only the quantity
+       * actually received was added to
+       * finished goods stock.
+       *
+       * If pending, nothing was added.
+       */
+      const received =
         Number(
-          log.waste_quantity || 0
+          log.received_quantity || 0
         );
-
-      const netProduction =
-        produced - waste;
 
       if (batches <= 0) {
 
@@ -1068,6 +1325,7 @@ export default function ProductionPage() {
 
       /* =========================
          MATERIAL CALCULATIONS
+         SAME AS EXISTING SYSTEM
       ========================== */
 
       const flourUsed =
@@ -1322,6 +1580,8 @@ export default function ProductionPage() {
 
       /* =========================
          CHECK FINISHED STOCK
+         
+         ONLY RECEIVED QUANTITY
       ========================== */
 
       const currentProductStock =
@@ -1331,13 +1591,13 @@ export default function ProductionPage() {
 
       if (
         currentProductStock <
-        netProduction
+        received
       ) {
 
         throw new Error(
           `Cannot delete this production.\n\n` +
           `Current ${log.bread} stock: ${currentProductStock.toLocaleString()}\n` +
-          `Stock produced by this record: ${netProduction.toLocaleString()}\n\n` +
+          `Stock received from this record: ${received.toLocaleString()}\n\n` +
           `The finished product has already been used.`
         );
 
@@ -1398,30 +1658,36 @@ export default function ProductionPage() {
 
       /* =========================
          REVERSE FINISHED PRODUCT
+         
+         ONLY IF IT WAS RECEIVED
       ========================== */
 
-      const newProductStock =
-        currentProductStock -
-        netProduction;
+      if (received > 0) {
 
-      const {
-        error: stockError,
-      } = await supabase
-        .from("products")
-        .update({
-          stock:
-            newProductStock,
-        })
-        .eq(
-          "id",
-          product.id
-        );
+        const newProductStock =
+          currentProductStock -
+          received;
 
-      if (stockError) {
+        const {
+          error: stockError,
+        } = await supabase
+          .from("products")
+          .update({
+            stock:
+              newProductStock,
+          })
+          .eq(
+            "id",
+            product.id
+          );
 
-        throw new Error(
-          `Failed to reverse ${log.bread} stock: ${stockError.message}`
-        );
+        if (stockError) {
+
+          throw new Error(
+            `Failed to reverse ${log.bread} stock: ${stockError.message}`
+          );
+
+        }
 
       }
 
@@ -1477,12 +1743,13 @@ export default function ProductionPage() {
       await fetchData();
 
       setShowDeleteModal(false);
+
       setProductionToDelete(null);
 
       showNotification(
         "success",
         "Production Deleted",
-        `${log.bread} production was deleted. Finished stock and all production materials have been restored.`
+        `${log.bread} production was deleted. Production materials have been restored${received > 0 ? " and received finished stock has been reversed" : ""}.`
       );
 
     } catch (error: any) {
@@ -1504,60 +1771,154 @@ export default function ProductionPage() {
       setDeleting(false);
 
     }
-
   }
 
-  /* =========================
-     TOTALS
-  ========================== */
+/* =========================
+   TOTALS
+========================= */
 
-  /*
-   * KPI CARDS NOW USE THE
-   * SELECTED DATE.
-   *
-   * Default = TODAY
-   */
+/*
+ * Use the selected KPI date.
+ *
+ * We primarily use production_date.
+ * The created_at fallback protects against
+ * timezone/date differences caused by
+ * storing dates with toISOString().
+ */
+const selectedDateLogs =
+  productionLogs.filter((item) => {
 
-  const selectedDateLogs =
-    productionLogs.filter(
-      (item) =>
-        item.production_date ===
-        selectedKpiDate
+    const productionDate =
+      item.production_date;
+
+    const createdDate = item.created_at
+      ? new Date(item.created_at)
+          .toLocaleDateString(
+            "en-CA",
+            {
+              timeZone: "Africa/Lagos",
+            }
+          )
+      : "";
+
+    return (
+      productionDate === selectedKpiDate ||
+      createdDate === selectedKpiDate
     );
+  });
 
-  const totalProduced =
-    selectedDateLogs.reduce(
-      (sum, item) =>
-        sum +
+/*
+ * Normalize confirmation status so that
+ * "Confirmed", "confirmed", or accidental
+ * spaces do not prevent the KPI from displaying.
+ */
+const confirmedDateLogs =
+  selectedDateLogs.filter((item) => {
+
+    const status =
+      String(
+        item.confirmation_status || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    return status === "confirmed";
+  });
+
+/* =========================
+   TOTAL PRODUCED
+========================= */
+
+const totalProduced =
+  selectedDateLogs.reduce(
+    (sum, item) =>
+      sum +
+      Number(
+        item.quantity || 0
+      ),
+    0
+  );
+
+/* =========================
+   TOTAL DAMAGED
+========================= */
+
+const totalWaste =
+  confirmedDateLogs.reduce(
+    (sum, item) =>
+      sum +
+      Number(
+        item.confirmation_damage || 0
+      ),
+    0
+  );
+
+/* =========================
+   TOTAL DOUGH BATCHES
+========================= */
+
+const totalDoughBatches =
+  selectedDateLogs.reduce(
+    (sum, item) =>
+      sum +
+      Number(
+        item.dough_batches || 0
+      ),
+    0
+  );
+
+/* =========================
+   TOTAL RECEIVED
+========================= */
+
+const totalReceived =
+  confirmedDateLogs.reduce(
+    (sum, item) =>
+      sum +
+      Number(
+        item.received_quantity || 0
+      ),
+    0
+  );
+
+/* =========================
+   TOTAL MISSING
+========================= */
+
+const totalMissing =
+  confirmedDateLogs.reduce(
+    (sum, item) => {
+
+      const produced =
         Number(
           item.quantity || 0
-        ),
-      0
-    );
+        );
 
-  const totalWaste =
-    selectedDateLogs.reduce(
-      (sum, item) =>
-        sum +
+      const received =
         Number(
-          item.waste_quantity || 0
-        ),
-      0
-    );
+          item.received_quantity || 0
+        );
 
-  const totalDoughBatches =
-    selectedDateLogs.reduce(
-      (sum, item) =>
-        sum +
+      const damage =
         Number(
-          item.dough_batches || 0
-        ),
-      0
-    );
+          item.confirmation_damage || 0
+        );
 
-  const netProduction =
-    totalProduced -
-    totalWaste;
+      const missing =
+        produced -
+        received -
+        damage;
+
+      return (
+        sum +
+        Math.max(
+          0,
+          missing
+        )
+      );
+    },
+    0
+  );
 
   /* =========================
      SELECTED DATE DISPLAY
@@ -1612,6 +1973,12 @@ export default function ProductionPage() {
             .toLowerCase()
             .includes(search)
 
+          ||
+
+          (item.confirmation_status || "")
+            .toLowerCase()
+            .includes(search)
+
         );
 
       })
@@ -1637,7 +2004,7 @@ export default function ProductionPage() {
     <ProtectedRoute
       allowedRoles={[
         "admin",
-        "production",
+        "accountant",
       ]}
     >
 
@@ -1728,15 +2095,11 @@ export default function ProductionPage() {
                   <div className="flex-1">
 
                     <h3 className="text-white font-bold text-base">
-
                       {notification.title}
-
                     </h3>
 
                     <p className="text-slate-300 text-sm mt-1 leading-relaxed">
-
                       {notification.message}
-
                     </p>
 
                   </div>
@@ -1747,9 +2110,7 @@ export default function ProductionPage() {
                     }
                     className="text-slate-500 hover:text-white transition"
                   >
-
                     ✕
-
                   </button>
 
                 </div>
@@ -1818,15 +2179,11 @@ export default function ProductionPage() {
                   <div>
 
                     <h2 className="text-2xl font-black text-white">
-
                       Delete Production?
-
                     </h2>
 
                     <p className="text-slate-400 mt-2 text-sm leading-relaxed">
-
                       This action will reverse the production and restore all materials used.
-
                     </p>
 
                   </div>
@@ -1864,12 +2221,48 @@ export default function ProductionPage() {
                   <div className="flex justify-between gap-4 py-2">
 
                     <span className="text-slate-400">
-                      Waste
+                      Received
+                    </span>
+
+                    <span className="text-green-400 font-bold">
+                      {Number(
+                        productionToDelete.received_quantity || 0
+                      ).toLocaleString()}
+                    </span>
+
+                  </div>
+
+                  <div className="flex justify-between gap-4 py-2">
+
+                    <span className="text-slate-400">
+                      Damaged
                     </span>
 
                     <span className="text-red-400 font-bold">
                       {Number(
-                        productionToDelete.waste_quantity || 0
+                        productionToDelete.confirmation_damage || 0
+                      ).toLocaleString()}
+                    </span>
+
+                  </div>
+
+                  <div className="flex justify-between gap-4 py-2">
+
+                    <span className="text-slate-400">
+                      Missing
+                    </span>
+
+                    <span className="text-yellow-400 font-bold">
+                      {(
+                        Number(
+                          productionToDelete.quantity || 0
+                        ) -
+                        Number(
+                          productionToDelete.received_quantity || 0
+                        ) -
+                        Number(
+                          productionToDelete.confirmation_damage || 0
+                        )
                       ).toLocaleString()}
                     </span>
 
@@ -1898,7 +2291,7 @@ export default function ProductionPage() {
                     <span className="font-bold">
                       Warning:
                     </span>{" "}
-                    Finished product stock will be reduced and all materials deducted by this production will be restored.
+                    All production materials deducted by this record will be restored. Any finished stock received from this record will also be reversed.
 
                   </p>
 
@@ -1914,9 +2307,7 @@ export default function ProductionPage() {
                     }}
                     className="flex-1 px-5 py-3.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold transition disabled:opacity-50"
                   >
-
                     Cancel
-
                   </button>
 
                   <button
@@ -1951,6 +2342,291 @@ export default function ProductionPage() {
         )}
 
         {/* ==========================================
+                    STORE CONFIRMATION MODAL
+        ========================================== */}
+
+        {showProductionDetails &&
+          selectedProduction && (
+
+          <div className="fixed inset-0 z-[9997] flex items-center justify-center p-6">
+
+            <div
+              className="absolute inset-0 bg-black/75 backdrop-blur-md"
+              onClick={() => {
+                if (!confirming) {
+                  setShowProductionDetails(false);
+                  setSelectedProduction(null);
+                }
+              }}
+            />
+
+            <div className="relative w-full max-w-2xl rounded-3xl border border-yellow-500/20 bg-[#0b1424] shadow-2xl overflow-hidden">
+
+              <div className="px-8 py-6 border-b border-slate-700">
+
+                <div className="flex items-center justify-between">
+
+                  <div>
+
+                    <p className="text-yellow-400 text-sm font-bold uppercase tracking-wider">
+                      Store Confirmation
+                    </p>
+
+                    <h2 className="text-3xl font-black text-white mt-2">
+                      {selectedProduction.bread}
+                    </h2>
+
+                    <p className="text-slate-400 mt-1">
+                      Batch {selectedProduction.batch}
+                    </p>
+
+                  </div>
+
+                  <button
+                    disabled={confirming}
+                    onClick={() => {
+                      setShowProductionDetails(false);
+                      setSelectedProduction(null);
+                    }}
+                    className="text-slate-500 hover:text-white text-xl"
+                  >
+                    ✕
+                  </button>
+
+                </div>
+
+              </div>
+
+              <div className="p-8">
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-7">
+
+                  <div className="rounded-2xl bg-blue-500/10 border border-blue-500/20 p-4">
+
+                    <p className="text-blue-300 text-xs uppercase">
+                      Produced
+                    </p>
+
+                    <p className="text-2xl font-black text-white mt-2">
+                      {Number(
+                        selectedProduction.quantity || 0
+                      ).toLocaleString()}
+                    </p>
+
+                  </div>
+
+                  <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/20 p-4">
+
+                    <p className="text-yellow-300 text-xs uppercase">
+                      Dough
+                    </p>
+
+                    <p className="text-2xl font-black text-white mt-2">
+                      {Number(
+                        selectedProduction.dough_batches || 0
+                      ).toLocaleString()}
+                    </p>
+
+                  </div>
+
+                  <div className="rounded-2xl bg-orange-500/10 border border-orange-500/20 p-4">
+
+                    <p className="text-orange-300 text-xs uppercase">
+                      Shift
+                    </p>
+
+                    <p className="text-lg font-black text-white mt-2">
+                      {selectedProduction.shift}
+                    </p>
+
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-800 border border-slate-700 p-4">
+
+                    <p className="text-slate-400 text-xs uppercase">
+                      Status
+                    </p>
+
+                    <p className="text-lg font-black text-yellow-400 mt-2">
+                      Pending
+                    </p>
+
+                  </div>
+
+                </div>
+
+                <div className="rounded-2xl bg-slate-900 border border-slate-700 p-6">
+
+                  <h3 className="text-xl font-black text-white">
+                    Receive Bread Into Store
+                  </h3>
+
+                  <p className="text-slate-400 text-sm mt-1">
+                    Record the actual quantity physically received from production.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6">
+
+                    <div>
+
+                      <label className="block text-slate-300 text-sm font-bold mb-2">
+                        Received Pieces
+                      </label>
+
+                      <input
+                        type="number"
+                        min="0"
+                        max={Number(
+                          selectedProduction.quantity || 0
+                        )}
+                        value={confirmationReceived}
+                        disabled={confirming}
+                        onChange={(e) =>
+                          setConfirmationReceived(
+                            e.target.value
+                          )
+                        }
+                        placeholder="Enter received quantity"
+                        className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-4 text-white text-lg font-bold outline-none focus:border-green-500 disabled:opacity-60"
+                      />
+
+                    </div>
+
+                    <div>
+
+                      <label className="block text-slate-300 text-sm font-bold mb-2">
+                        Damaged / Waste
+                      </label>
+
+                      <input
+                        type="number"
+                        min="0"
+                        max={Number(
+                          selectedProduction.quantity || 0
+                        )}
+                        value={confirmationDamage}
+                        disabled={confirming}
+                        onChange={(e) =>
+                          setConfirmationDamage(
+                            e.target.value
+                          )
+                        }
+                        placeholder="Enter damaged pieces"
+                        className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-4 text-white text-lg font-bold outline-none focus:border-red-500 disabled:opacity-60"
+                      />
+
+                    </div>
+
+                  </div>
+
+                  <div className="mt-6 rounded-2xl bg-slate-800 border border-slate-700 p-5">
+
+                    <div className="flex justify-between py-2">
+
+                      <span className="text-slate-400">
+                        Total Produced
+                      </span>
+
+                      <span className="text-white font-bold">
+                        {Number(
+                          selectedProduction.quantity || 0
+                        ).toLocaleString()}
+                      </span>
+
+                    </div>
+
+                    <div className="flex justify-between py-2">
+
+                      <span className="text-green-400">
+                        Received
+                      </span>
+
+                      <span className="text-green-400 font-bold">
+                        {Number(
+                          confirmationReceived || 0
+                        ).toLocaleString()}
+                      </span>
+
+                    </div>
+
+                    <div className="flex justify-between py-2">
+
+                      <span className="text-red-400">
+                        Damaged
+                      </span>
+
+                      <span className="text-red-400 font-bold">
+                        {Number(
+                          confirmationDamage || 0
+                        ).toLocaleString()}
+                      </span>
+
+                    </div>
+
+                    <div className="border-t border-slate-700 mt-3 pt-3 flex justify-between">
+
+                      <span className="text-yellow-400 font-bold">
+                        Missing Pieces
+                      </span>
+
+                      <span className="text-yellow-400 font-black text-xl">
+
+                        {(
+                          Number(
+                            selectedProduction.quantity || 0
+                          ) -
+                          Number(
+                            confirmationReceived || 0
+                          ) -
+                          Number(
+                            confirmationDamage || 0
+                          )
+                        ).toLocaleString()}
+
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                <div className="flex gap-3 mt-7">
+
+                  <button
+                    disabled={confirming}
+                    onClick={() => {
+                      setShowProductionDetails(false);
+                      setSelectedProduction(null);
+                    }}
+                    className="flex-1 px-5 py-4 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold transition disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    disabled={confirming}
+                    onClick={confirmProduction}
+                    className="flex-1 px-5 py-4 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black transition shadow-lg shadow-yellow-900/20 disabled:opacity-50"
+                  >
+
+                    {confirming
+                      ? "Confirming..."
+                      : "Confirm & Receive Stock"}
+
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        )}
+
+        {/* ==========================================
                     HEADER
         ========================================== */}
 
@@ -1959,22 +2635,16 @@ export default function ProductionPage() {
           <div>
 
             <h1 className="text-5xl font-black text-white">
-
               Production Center
-
             </h1>
 
             <p className="text-slate-400 mt-3 text-lg">
-
               Live bakery production, dough tracking and inventory automation
-
             </p>
 
           </div>
 
           <div className="flex items-center gap-3">
-
-            {/* REFRESH */}
 
             <button
               onClick={handleRefresh}
@@ -2011,9 +2681,7 @@ export default function ProductionPage() {
             <div className="bg-slate-900 border border-slate-700 rounded-3xl px-8 py-6">
 
               <p className="text-slate-400">
-
                 Today
-
               </p>
 
               <h2 className="text-2xl font-bold text-white mt-2">
@@ -2031,9 +2699,7 @@ export default function ProductionPage() {
               </h2>
 
               <p className="text-yellow-400 mt-3 font-semibold">
-
                 Production Operations
-
               </p>
 
             </div>
@@ -2051,14 +2717,13 @@ export default function ProductionPage() {
           <div>
 
             <h3 className="text-xl font-bold text-white">
-
               Production Performance
-
             </h3>
 
             <p className="text-slate-400 text-sm mt-1">
 
               KPI figures are showing production for{" "}
+
               <span className="text-yellow-400 font-semibold">
                 {selectedDateDisplay}
               </span>
@@ -2070,9 +2735,7 @@ export default function ProductionPage() {
           <div className="flex items-center gap-3">
 
             <label className="text-slate-400 text-sm font-semibold">
-
               View Date
-
             </label>
 
             <input
@@ -2097,9 +2760,7 @@ export default function ProductionPage() {
                 }
                 className="px-4 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-bold transition"
               >
-
                 Today
-
               </button>
 
             )}
@@ -2114,74 +2775,56 @@ export default function ProductionPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
 
-          {/* Today's / Selected Production */}
+          {/* Production */}
 
           <div className="rounded-3xl border border-blue-800 bg-gradient-to-br from-slate-900 to-blue-950 p-7 shadow-xl">
 
             <p className="text-blue-300 text-sm uppercase tracking-wider">
-
               Production
-
             </p>
 
             <h2 className="text-5xl font-black text-white mt-4">
-
               {totalProduced.toLocaleString()}
-
             </h2>
 
             <p className="text-blue-200 mt-3">
-
               Pieces Produced
-
             </p>
 
           </div>
 
-          {/* Waste */}
+          {/* Damaged */}
 
           <div className="rounded-3xl border border-red-800 bg-gradient-to-br from-slate-900 to-red-950 p-7 shadow-xl">
 
             <p className="text-red-300 text-sm uppercase tracking-wider">
-
-              Waste
-
+              Damaged
             </p>
 
             <h2 className="text-5xl font-black text-red-400 mt-4">
-
               {totalWaste.toLocaleString()}
-
             </h2>
 
             <p className="text-red-200 mt-3">
-
-              Damaged Pieces
-
+              Confirmed Damaged Pieces
             </p>
 
           </div>
 
-          {/* Net Production */}
+          {/* Missing */}
 
-          <div className="rounded-3xl border border-green-800 bg-gradient-to-br from-slate-900 to-green-950 p-7 shadow-xl">
+          <div className="rounded-3xl border border-yellow-800 bg-gradient-to-br from-slate-900 to-yellow-950 p-7 shadow-xl">
 
-            <p className="text-green-300 text-sm uppercase tracking-wider">
-
-              Net Production
-
+            <p className="text-yellow-300 text-sm uppercase tracking-wider">
+              Missing Pieces
             </p>
 
-            <h2 className="text-5xl font-black text-green-400 mt-4">
-
-              {netProduction.toLocaleString()}
-
+            <h2 className="text-5xl font-black text-yellow-400 mt-4">
+              {totalMissing.toLocaleString()}
             </h2>
 
-            <p className="text-green-200 mt-3">
-
-              Added To Stock
-
+            <p className="text-yellow-200 mt-3">
+              Unaccounted For
             </p>
 
           </div>
@@ -2191,21 +2834,15 @@ export default function ProductionPage() {
           <div className="rounded-3xl border border-yellow-800 bg-gradient-to-br from-slate-900 to-yellow-950 p-7 shadow-xl">
 
             <p className="text-yellow-300 text-sm uppercase tracking-wider">
-
               Dough Batches
-
             </p>
 
             <h2 className="text-5xl font-black text-yellow-400 mt-4">
-
               {totalDoughBatches.toLocaleString()}
-
             </h2>
 
             <p className="text-yellow-200 mt-3">
-
               Mixed On Selected Date
-
             </p>
 
           </div>
@@ -2225,15 +2862,11 @@ export default function ProductionPage() {
             <div className="px-8 py-6 border-b border-slate-700">
 
               <h2 className="text-3xl font-bold text-white">
-
                 Record Production
-
               </h2>
 
               <p className="text-slate-400 mt-2">
-
                 Upload today's bakery production and automatically update inventory.
-
               </p>
 
             </div>
@@ -2257,8 +2890,6 @@ export default function ProductionPage() {
                 setSelectedProduct={setSelectedProduct}
                 quantityProduced={quantityProduced}
                 setQuantityProduced={setQuantityProduced}
-                wasteQuantity={wasteQuantity}
-                setWasteQuantity={setWasteQuantity}
                 doughBatches={doughBatches}
                 setDoughBatches={setDoughBatches}
                 shift={shift}
@@ -2278,15 +2909,11 @@ export default function ProductionPage() {
             <div className="px-8 py-6 border-b border-slate-700">
 
               <h2 className="text-3xl font-bold text-white">
-
                 Live Recipe Preview
-
               </h2>
 
               <p className="text-slate-400 mt-2">
-
                 Ingredient deduction before production is uploaded.
-
               </p>
 
             </div>
@@ -2315,6 +2942,179 @@ export default function ProductionPage() {
         </div>
 
         {/* ==========================================
+                    STORE CONFIRMATION
+        ========================================== */}
+
+        <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden mt-10">
+
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-8 py-6 border-b border-slate-700">
+
+            <div>
+
+              <h2 className="text-3xl font-bold text-white">
+                Store Confirmation
+              </h2>
+
+              <p className="text-slate-400 mt-2">
+                Confirm bread received from production and record damaged or missing pieces.
+              </p>
+
+            </div>
+
+            <div className="px-4 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+
+              <span className="text-yellow-400 font-bold">
+                {pendingProductions.length} Pending
+              </span>
+
+            </div>
+
+          </div>
+
+          <div className="overflow-x-auto">
+
+            <table className="min-w-full">
+
+              <thead className="bg-slate-800">
+
+                <tr>
+
+                  <th className="px-6 py-4 text-left text-slate-300">
+                    Product
+                  </th>
+
+                  <th className="px-6 py-4 text-center text-slate-300">
+                    Shift
+                  </th>
+
+                  <th className="px-6 py-4 text-center text-slate-300">
+                    Produced
+                  </th>
+
+                  <th className="px-6 py-4 text-center text-slate-300">
+                    Dough
+                  </th>
+
+                  <th className="px-6 py-4 text-center text-slate-300">
+                    Date
+                  </th>
+
+                  <th className="px-6 py-4 text-center text-slate-300">
+                    Action
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {pendingProductions.length === 0 && (
+
+                  <tr>
+
+                    <td
+                      colSpan={6}
+                      className="text-center py-16 text-slate-400"
+                    >
+                      No production is waiting for Store Confirmation.
+                    </td>
+
+                  </tr>
+
+                )}
+
+                {pendingProductions.map(
+                  (log, index) => (
+
+                    <tr
+                      key={
+                        log.id ||
+                        index
+                      }
+                      className="border-b border-slate-800 hover:bg-slate-800/40 transition"
+                    >
+
+                      <td className="px-6 py-5">
+
+                        <div>
+
+                          <p className="font-bold text-white">
+                            {log.bread}
+                          </p>
+
+                          <p className="text-xs text-slate-400">
+                            {log.batch}
+                          </p>
+
+                        </div>
+
+                      </td>
+
+                      <td className="px-6 py-5 text-center">
+
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            log.shift ===
+                            "Morning"
+                              ? "bg-orange-500/20 text-orange-300"
+                              : "bg-indigo-500/20 text-indigo-300"
+                          }`}
+                        >
+                          {log.shift}
+                        </span>
+
+                      </td>
+
+                      <td className="px-6 py-5 text-center text-blue-300 font-bold">
+
+                        {Number(
+                          log.quantity || 0
+                        ).toLocaleString()}
+
+                      </td>
+
+                      <td className="px-6 py-5 text-center text-yellow-400 font-bold">
+
+                        {Number(
+                          log.dough_batches || 0
+                        ).toLocaleString()}
+
+                      </td>
+
+                      <td className="px-6 py-5 text-center text-slate-300">
+
+                        {log.production_date}
+
+                      </td>
+
+                      <td className="px-6 py-5 text-center">
+
+                        <button
+                          onClick={() =>
+                            openConfirmation(log)
+                          }
+                          className="bg-yellow-500 hover:bg-yellow-400 text-black px-5 py-2.5 rounded-xl font-black transition shadow-lg shadow-yellow-950/20"
+                        >
+                          Confirm Receipt
+                        </button>
+
+                      </td>
+
+                    </tr>
+
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
+        {/* ==========================================
                     PRODUCTION HISTORY
         ========================================== */}
 
@@ -2325,15 +3125,11 @@ export default function ProductionPage() {
             <div>
 
               <h2 className="text-3xl font-bold text-white">
-
                 Production History
-
               </h2>
 
               <p className="text-slate-400 mt-2">
-
                 Latest production uploaded to the database
-
               </p>
 
             </div>
@@ -2377,11 +3173,15 @@ export default function ProductionPage() {
                   </th>
 
                   <th className="px-6 py-4 text-center text-slate-300">
-                    Waste
+                    Received
                   </th>
 
                   <th className="px-6 py-4 text-center text-slate-300">
-                    Net
+                    Damaged
+                  </th>
+
+                  <th className="px-6 py-4 text-center text-slate-300">
+                    Missing
                   </th>
 
                   <th className="px-6 py-4 text-center text-slate-300">
@@ -2407,12 +3207,10 @@ export default function ProductionPage() {
                   <tr>
 
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="text-center py-16 text-slate-400"
                     >
-
                       No production history found.
-
                     </td>
 
                   </tr>
@@ -2422,13 +3220,28 @@ export default function ProductionPage() {
                 {displayedHistory.map(
                   (log, index) => {
 
-                    const net =
+                    const produced =
                       Number(
                         log.quantity || 0
-                      ) -
-                      Number(
-                        log.waste_quantity || 0
                       );
+
+                    const received =
+                      Number(
+                        log.received_quantity || 0
+                      );
+
+                    const damage =
+                      Number(
+                        log.confirmation_damage || 0
+                      );
+
+                    const missing =
+                      log.confirmation_status ===
+                      "Confirmed"
+                        ? produced -
+                          received -
+                          damage
+                        : 0;
 
                     return (
 
@@ -2445,15 +3258,11 @@ export default function ProductionPage() {
                           <div>
 
                             <p className="font-bold text-white">
-
                               {log.bread}
-
                             </p>
 
                             <p className="text-xs text-slate-400">
-
                               {log.batch}
-
                             </p>
 
                           </div>
@@ -2470,48 +3279,47 @@ export default function ProductionPage() {
                                 : "bg-indigo-500/20 text-indigo-300"
                             }`}
                           >
-
                             {log.shift}
-
                           </span>
 
                         </td>
 
                         <td className="px-6 py-5 text-center text-yellow-400 font-bold">
-
                           {log.dough_batches}
-
                         </td>
 
                         <td className="px-6 py-5 text-center text-blue-300 font-bold">
-
-                          {Number(
-                            log.quantity
-                          ).toLocaleString()}
-
-                        </td>
-
-                        <td className="px-6 py-5 text-center text-red-400 font-bold">
-
-                          {Number(
-                            log.waste_quantity
-                          ).toLocaleString()}
-
+                          {produced.toLocaleString()}
                         </td>
 
                         <td className="px-6 py-5 text-center text-green-400 font-bold">
+                          {received.toLocaleString()}
+                        </td>
 
-                          {net.toLocaleString()}
+                        <td className="px-6 py-5 text-center text-red-400 font-bold">
+                          {damage.toLocaleString()}
+                        </td>
 
+                        <td className="px-6 py-5 text-center text-yellow-400 font-black">
+                          {missing.toLocaleString()}
                         </td>
 
                         <td className="px-6 py-5 text-center">
 
-                          <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-bold">
+                          {log.confirmation_status ===
+                          "Confirmed" ? (
 
-                            {log.status}
+                            <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-bold">
+                              Confirmed
+                            </span>
 
-                          </span>
+                          ) : (
+
+                            <span className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-300 text-xs font-bold">
+                              Pending Store
+                            </span>
+
+                          )}
 
                         </td>
 
@@ -2533,9 +3341,7 @@ export default function ProductionPage() {
                             }
                             className="bg-red-600/90 hover:bg-red-500 text-white px-4 py-2 rounded-xl font-bold transition shadow-lg shadow-red-950/20"
                           >
-
                             Delete
-
                           </button>
 
                         </td>
@@ -2553,8 +3359,6 @@ export default function ProductionPage() {
 
           </div>
 
-          {/* HISTORY REMAINS LIMITED TO 10 */}
-
           {filteredHistory.length >
             historyLimit && (
 
@@ -2568,9 +3372,7 @@ export default function ProductionPage() {
                 }
                 className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-8 py-3 rounded-xl transition shadow-lg shadow-yellow-900/20"
               >
-
                 Load More
-
               </button>
 
             </div>
@@ -2582,7 +3384,5 @@ export default function ProductionPage() {
       </div>
 
     </ProtectedRoute>
-
   );
-
 }

@@ -457,10 +457,17 @@ export default function CustomersPage() {
       const customerId =
         customerToDelete.customerId;
 
-      const { error } = await supabase
-        .from("customers")
-        .delete()
-        .eq("id", customerId);
+const { data: deletedCustomer, error } = await supabase
+  .from("customers")
+  .delete()
+  .eq("id", customerId)
+  .select();
+
+console.log("===== CUSTOMER DELETE DEBUG =====");
+console.log("Customer ID:", customerId);
+console.log("Deleted Customer:", JSON.stringify(deletedCustomer, null, 2));
+console.log("Delete Error:", JSON.stringify(error, null, 2));
+console.log("================================");
 
       if (error) {
         console.error(
