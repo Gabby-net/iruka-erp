@@ -7,3 +7,193 @@ body {
   color: #111827;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* =========================================================
+   GLOBAL RESPONSIVE SAFETY
+   Does not change the desktop design.
+========================================================= */
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   TABLETS / iPAD
+   768px - 1024px
+========================================================= */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /*
+    Allow grid and flex children to shrink properly.
+    This is important for KPI cards containing long figures.
+  */
+  main,
+  section,
+  article,
+  aside,
+  header,
+  nav,
+  div {
+    min-width: 0;
+  }
+
+  /*
+    Prevent long numbers, names and headings from
+    escaping their containers.
+  */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  /*
+    Keep images and icons inside their containers.
+  */
+  img,
+  svg {
+    max-width: 100%;
+  }
+
+  /*
+    Tables can scroll horizontally instead of
+    breaking the entire page.
+  */
+  .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /*
+    Prevent fixed-width elements from becoming wider
+    than the iPad screen.
+  */
+  [class*="w-["] {
+    max-width: 100%;
+  }
+
+  /*
+    Keep modal/dialog content inside the viewport.
+  */
+  [class*="max-w-"] {
+    min-width: 0;
+  }
+}
+
+/* =========================================================
+   PHONES
+   Below 768px
+========================================================= */
+
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /*
+    Allow all cards and layout containers to shrink.
+  */
+  main,
+  section,
+  article,
+  aside,
+  header,
+  nav,
+  div {
+    min-width: 0;
+  }
+
+  /*
+    Long financial figures and names should wrap
+    rather than overflow their cards.
+  */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  /*
+    Keep images/icons inside their containers.
+  */
+  img,
+  svg {
+    max-width: 100%;
+  }
+
+  /*
+    Tables remain usable by horizontal scrolling.
+  */
+  .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /*
+    Fixed-width components should never exceed
+    the phone viewport.
+  */
+  [class*="w-["] {
+    max-width: 100%;
+  }
+
+  /*
+    Keep modal/dialog content inside the screen.
+  */
+  [class*="max-w-"] {
+    min-width: 0;
+  }
+}
+
+/* =========================================================
+   VERY SMALL PHONES
+   Below 480px
+========================================================= */
+
+@media (max-width: 479px) {
+  /*
+    Extra protection for very long currency values,
+    IDs, customer names and product names.
+  */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    overflow-wrap: anywhere;
+  }
+
+  /*
+    Prevent flex children from forcing horizontal overflow.
+  */
+  .flex {
+    min-width: 0;
+  }
+}

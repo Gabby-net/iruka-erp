@@ -498,15 +498,15 @@ export default function DashboardPage() {
 
         <div className="bg-gradient-to-br from-green-900 to-slate-900 rounded-3xl border border-green-700 shadow-2xl p-7">
 
-          <div className="flex justify-between">
+          <div className="flex flex-col md:flex-col xl:flex-row justify-between gap-5 xl:gap-0">
 
-            <div>
+            <div className="min-w-0">
 
               <p className="text-green-300">
                 Total Revenue
               </p>
 
-              <h2 className="text-4xl font-black text-white mt-4">
+              <h2 className="text-3xl md:text-3xl xl:text-4xl font-black text-white mt-4 break-words leading-tight">
                 ₦{revenue.toLocaleString()}
               </h2>
 
@@ -516,7 +516,7 @@ export default function DashboardPage() {
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center shrink-0">
 
               <DollarSign
                 className="text-green-400"
@@ -537,15 +537,15 @@ export default function DashboardPage() {
 
         <div className="bg-gradient-to-br from-blue-900 to-slate-900 rounded-3xl border border-blue-700 shadow-2xl p-7">
 
-          <div className="flex justify-between">
+          <div className="flex flex-col md:flex-col xl:flex-row justify-between gap-5 xl:gap-0">
 
-            <div>
+            <div className="min-w-0">
 
               <p className="text-blue-300">
                 Expenses
               </p>
 
-              <h2 className="text-4xl font-black text-white mt-4">
+              <h2 className="text-3xl md:text-3xl xl:text-4xl font-black text-white mt-4 break-words leading-tight">
                 ₦{totalExpenses.toLocaleString()}
               </h2>
 
@@ -555,7 +555,7 @@ export default function DashboardPage() {
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center shrink-0">
 
               <Wallet
                 className="text-blue-400"
@@ -576,15 +576,15 @@ export default function DashboardPage() {
 
         <div className="bg-gradient-to-br from-yellow-900 to-slate-900 rounded-3xl border border-yellow-700 shadow-2xl p-7">
 
-          <div className="flex justify-between">
+          <div className="flex flex-col md:flex-col xl:flex-row justify-between gap-5 xl:gap-0">
 
-            <div>
+            <div className="min-w-0">
 
               <p className="text-yellow-300">
                 Outstanding Debts
               </p>
 
-              <h2 className="text-4xl font-black text-white mt-4">
+              <h2 className="text-3xl md:text-3xl xl:text-4xl font-black text-white mt-4 break-words leading-tight">
                 ₦{totalDebts.toLocaleString()}
               </h2>
 
@@ -594,7 +594,7 @@ export default function DashboardPage() {
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-yellow-500/20 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-yellow-500/20 flex items-center justify-center shrink-0">
 
               <Users
                 className="text-yellow-400"
@@ -615,15 +615,15 @@ export default function DashboardPage() {
 
         <div className="bg-gradient-to-br from-red-900 to-slate-900 rounded-3xl border border-red-700 shadow-2xl p-7">
 
-          <div className="flex justify-between">
+          <div className="flex flex-col md:flex-col xl:flex-row justify-between gap-5 xl:gap-0">
 
-            <div>
+            <div className="min-w-0">
 
               <p className="text-red-300">
                 Flour Remaining
               </p>
 
-              <h2 className="text-4xl font-black text-white mt-4">
+              <h2 className="text-3xl md:text-3xl xl:text-4xl font-black text-white mt-4 break-words leading-tight">
                 {flourBags.toLocaleString()} Bags
               </h2>
 
@@ -633,7 +633,7 @@ export default function DashboardPage() {
 
             </div>
 
-            <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center shrink-0">
 
               <Wheat
                 className="text-red-400"
@@ -1241,12 +1241,12 @@ export default function DashboardPage() {
 
               return (
 
-<button
-  type="button"
-  key={product.id}
-  onClick={() =>
-    router.push(`/products/${product.id}?from=dashboard`)
-  }
+                <button
+                  type="button"
+                  key={product.id}
+                  onClick={() =>
+                    router.push(`/products/${product.id}?from=dashboard`)
+                  }
                   className="text-left bg-[#111c2d] border border-slate-700 rounded-3xl overflow-hidden hover:border-blue-500 transition duration-300 hover:-translate-y-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
 

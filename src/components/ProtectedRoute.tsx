@@ -23,31 +23,110 @@ export default function ProtectedRoute({
   }, []);
 
   async function checkAccess() {
-    const { data: authData } =
-      await supabase.auth.getUser();
+    try {
+      // ============================================================
+      // GET CURRENT AUTHENTICATED USER
+      // ============================================================
 
-    const email =
-      authData?.user?.email;
+      const {
+        data: authData,
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    if (!email) {
-      router.push("/login");
-      return;
+      if (authError || !authData?.user) {
+        router.replace("/login");
+        return;
+      }
+
+      const userId = authData.user.id;
+
+      // ============================================================
+      // GET ERP USER BY AUTH UID
+      //
+      // public.users.id is linked to the Supabase Auth user ID.
+      // Do NOT use email as the primary security match.
+      // ============================================================
+
+      const {
+        data: userData,
+        error: userError,
+      } = await supabase
+        .from("users")
+        .select("role, is_active")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (userError) {
+        console.error(
+          "ProtectedRoute user lookup error:",
+          userError
+        );
+
+        router.replace("/unauthorized");
+        return;
+      }
+
+      // ============================================================
+      // USER DOES NOT EXIST IN ERP USERS TABLE
+      // ============================================================
+
+      if (!userData) {
+        console.error(
+          "Authenticated user has no ERP user record."
+        );
+
+        router.replace("/unauthorized");
+        return;
+      }
+
+      // ============================================================
+      // CHECK ACTIVE STATUS
+      // ============================================================
+
+      if (userData.is_active !== true) {
+        console.error(
+          "User account is inactive."
+        );
+
+        await supabase.auth.signOut();
+
+        router.replace("/login");
+        return;
+      }
+
+      // ============================================================
+      // CHECK ROLE
+      // ============================================================
+
+      const role = userData.role;
+
+      if (!role || !allowedRoles.includes(role)) {
+        console.error(
+          `Access denied. Role "${role}" is not allowed.`
+        );
+
+        router.replace("/unauthorized");
+        return;
+      }
+
+      // ============================================================
+      // ACCESS GRANTED
+      // ============================================================
+
+      setLoading(false);
+    } catch (error) {
+      console.error(
+        "ProtectedRoute access error:",
+        error
+      );
+
+      router.replace("/unauthorized");
     }
-
-    const { data } = await supabase
-      .from("users")
-      .select("role")
-      .eq("email", email);
-
-    const role = data?.[0]?.role;
-
-    if (!allowedRoles.includes(role)) {
-      router.push("/unauthorized");
-      return;
-    }
-
-    setLoading(false);
   }
+
+  // ============================================================
+  // LOADING SCREEN
+  // ============================================================
 
   if (loading) {
     return (
@@ -62,13 +141,13 @@ export default function ProtectedRoute({
 
           <div className="mb-8 animate-pulse">
 
-<Image
-  src="/logo/nkiruka-logo.png"
-  alt="NKIRUKA ERP"
-width={140}
-height={140}
-  priority
-/>
+            <Image
+              src="/logo/nkiruka-logo.png"
+              alt="NKIRUKA ERP"
+              width={140}
+              height={140}
+              priority
+            />
 
           </div>
 
